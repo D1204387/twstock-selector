@@ -171,6 +171,16 @@ GLARITY_STYLE = """
         box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     }
     
+    /* 表格欄名置中 */
+    .stDataFrame th {
+        text-align: center !important;
+    }
+    
+    /* 表格數值欄位置中 */
+    .stDataFrame td {
+        text-align: center !important;
+    }
+    
     /* 頁尾 */
     .footer {
         text-align: center;
