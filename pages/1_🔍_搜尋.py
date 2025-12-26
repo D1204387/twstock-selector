@@ -286,7 +286,7 @@ else:
         st.caption(f"顯示全部 {total_count} 檔{search_type if search_type != '全部' else '標的'}")
     
     # 顯示篩選後的資料
-    display_cols = ['stock_id', 'name', 'industry', 'score', 'roe', 'pe', 'dividend_yield']
+    display_cols = ['stock_id', 'name', 'price', 'score', 'roe', 'pe', 'dividend_yield']
     display_cols = [c for c in display_cols if c in filtered_df.columns]
     display_df = filtered_df[display_cols].iloc[start_idx:end_idx].copy()
     
@@ -294,7 +294,7 @@ else:
     display_df.insert(0, '序號', range(start_idx + 1, end_idx + 1))
     
     column_names = {
-        'stock_id': '代號', 'name': '名稱', 'industry': '產業', 'score': '評分',
+        'stock_id': '代號', 'name': '名稱', 'price': '股價', 'score': '評分',
         'roe': 'ROE%(40%)', 'pe': 'PE(30%)', 'dividend_yield': '殖利率(%)'
     }
     display_df = display_df.rename(columns=column_names)

@@ -228,14 +228,14 @@ else:
         end_idx = total_count
         st.caption(f"顯示全部 {total_count} 筆")
     
-    display_cols = ['stock_id', 'name', 'industry', 'score', 'roe', 'pe', 'pb', 'dividend_yield', 'debt_ratio']
+    display_cols = ['stock_id', 'name', 'price', 'score', 'roe', 'pe', 'pb', 'dividend_yield', 'debt_ratio']
     display_cols = [c for c in display_cols if c in filtered_df.columns]
     display_df = filtered_df[display_cols].iloc[start_idx:end_idx].copy()
     
     # 加入序號欄位
     display_df.insert(0, '序號', range(start_idx + 1, end_idx + 1))
     
-    column_names = {'stock_id': '代號', 'name': '名稱', 'industry': '產業', 'score': '評分',
+    column_names = {'stock_id': '代號', 'name': '名稱', 'price': '股價', 'score': '評分',
                     'roe': 'ROE%(40%)', 'pe': 'PE(30%)', 'pb': 'PB(15%)', 'dividend_yield': '殖利率(%)', 'debt_ratio': '負債率%(15%)'}
     display_df = display_df.rename(columns=column_names)
     

@@ -237,14 +237,14 @@ if query:
             show_count = len(filtered_df)
             
             # 表格
-            display_cols = ['stock_id', 'name', 'industry', 'score', 'roe', 'pe', 'pb', 'dividend_yield', 'debt_ratio']
+            display_cols = ['stock_id', 'name', 'price', 'score', 'roe', 'pe', 'pb', 'dividend_yield', 'debt_ratio']
             display_cols = [c for c in display_cols if c in filtered_df.columns]
             display_df = filtered_df[display_cols].head(show_count).copy()
             
             # 加入序號欄位
             display_df.insert(0, '序號', range(1, len(display_df) + 1))
             
-            column_names = {'stock_id': '代號', 'name': '名稱', 'industry': '產業', 'score': '評分',
+            column_names = {'stock_id': '代號', 'name': '名稱', 'price': '股價', 'score': '評分',
                             'roe': 'ROE%(40%)', 'pe': 'PE(30%)', 'pb': 'PB(15%)', 'dividend_yield': '殖利率(%)', 'debt_ratio': '負債率%(15%)'}
             display_df = display_df.rename(columns=column_names)
             

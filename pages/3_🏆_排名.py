@@ -144,11 +144,11 @@ else:
     display_df['排名'] = range(1, len(display_df) + 1)
     display_df['等級'] = display_df['score'].apply(get_score_grade)
     
-    display_cols = ['排名', 'stock_id', 'name', 'industry', 'score', '等級', 'roe', 'pe', 'pb', 'dividend_yield', 'debt_ratio']
+    display_cols = ['排名', 'stock_id', 'name', 'price', 'score', '等級', 'roe', 'pe', 'pb', 'dividend_yield', 'debt_ratio']
     display_cols = [c for c in display_cols if c in display_df.columns or c in ['排名', '等級']]
     result_df = display_df[display_cols].copy()
     
-    column_names = {'stock_id': '代號', 'name': '名稱', 'industry': '產業', 'score': '評分',
+    column_names = {'stock_id': '代號', 'name': '名稱', 'price': '股價', 'score': '評分',
                     'roe': 'ROE%(40%)', 'pe': 'PE(30%)', 'pb': 'PB(15%)', 'dividend_yield': '殖利率(%)', 'debt_ratio': '負債率%(15%)'}
     result_df = result_df.rename(columns=column_names)
     
