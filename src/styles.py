@@ -176,11 +176,6 @@ GLARITY_STYLE = """
         text-align: center !important;
     }
     
-    /* 表格數值欄位置中 */
-    .stDataFrame td {
-        text-align: center !important;
-    }
-    
     /* 頁尾 */
     .footer {
         text-align: center;
