@@ -11,6 +11,7 @@ GLARITY_STYLE = """
     /* 隱藏預設元素 */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
+    header {visibility: hidden;}
     
     /* 側邊欄 - 淺藍灰色 */
     [data-testid="stSidebar"] {
