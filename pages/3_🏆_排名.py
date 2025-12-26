@@ -1,6 +1,7 @@
 """
 台股智選系統 - 排名頁面
 Taiwan Stock Selection System - Ranking Page
+Glarity 風格設計
 """
 
 import streamlit as st
@@ -14,14 +15,38 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.data_fetcher import get_stock_list, generate_sample_data
 from src.stock_analyzer import calculate_score, get_top_stocks, get_score_grade
+from src.styles import GLARITY_STYLE
 
 st.set_page_config(page_title="排名 - 台股智選系統", page_icon="🏆", layout="wide")
 
-# 灰藍色調 CSS
+# 套用 Glarity 風格
+st.markdown(GLARITY_STYLE, unsafe_allow_html=True)
+
+# 額外的排名頁樣式
 st.markdown("""
 <style>
-    .rank-badge { background: #2563eb; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; 
-                  font-weight: 600; font-size: 0.85rem; }
+    .rank-header {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .rank-header h2 {
+        margin: 0;
+        font-size: 1.5rem;
+    }
+    .rank-header p {
+        margin: 0.5rem 0 0 0;
+        opacity: 0.9;
+    }
+    .grade-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
     .grade-a { background: #2563eb; color: white; }
     .grade-b { background: #60a5fa; color: white; }
     .grade-c { background: #9ca3af; color: white; }
@@ -31,6 +56,20 @@ st.markdown("""
 
 st.title("🏆 綜合排名")
 st.caption("根據綜合評分系統，找出最優質的股票")
+
+# 側邊欄說明
+with st.sidebar:
+    st.divider()
+    with st.expander("📚 快速說明"):
+        st.markdown("""
+        **評分權重**
+        - ROE：40%
+        - PE：30%
+        - PB：15%
+        - 負債率：15%
+        
+        [返回首頁查看完整說明](/)
+        """)
 
 @st.cache_data(ttl=3600)
 def load_data():
@@ -42,13 +81,50 @@ def load_data():
 df = load_data()
 
 # 評分說明
-with st.expander("評分系統說明"):
+with st.expander("📚 評分系統說明", expanded=False):
     st.markdown("""
-    **權重：** ROE (40%) | PE (30%) | PB (15%) | 負債率 (15%)  
-    **等級：** A+ (9-10) | A (8-9) | B+ (7-8) | B (6-7) | C (5-6) | D (3-5) | F (0-3)
+    ### 📊 總評分公式
+    
+    **總分 = ROE分數×40% + PE分數×30% + PB分數×15% + 負債率分數×15%**
+    
+    ---
+    
+    ### 🔢 各指標評分方式（滿分 10 分）
+    
+    **1️⃣ ROE 評分（權重 40%）**
+    - 公式：ROE ÷ 3（最高 10 分）
+    - 範例：ROE = 21% → 21 ÷ 3 = 7 分
+    - 說明：ROE 30% 以上得滿分 10 分
+    
+    **2️⃣ PE 評分（權重 30%）**
+    - 公式：10 - (PE 與 15 的差距 ÷ 3)
+    - 範例：PE = 12 → 10 - |12-15|÷3 = 10 - 1 = 9 分
+    - 說明：PE 越接近 15 分數越高
+    
+    **3️⃣ PB 評分（權重 15%）**
+    - 公式：(3 - PB) × 3（最高 10 分）
+    - 範例：PB = 1.5 → (3-1.5)×3 = 4.5 分
+    - 說明：PB 越低分數越高，PB < 1 得滿分
+    
+    **4️⃣ 負債率評分（權重 15%）**
+    - 公式：(100 - 負債率) ÷ 10
+    - 範例：負債率 = 30% → (100-30)÷10 = 7 分
+    - 說明：負債率越低分數越高
+    
+    ---
+    
+    ### 🏆 等級對照表
+    
+    | 評分 | 等級 | 評分 | 等級 |
+    |------|------|------|------|
+    | 9-10 | A+ | 5-6 | C |
+    | 8-9 | A | 3-5 | D |
+    | 7-8 | B+ | 0-3 | F |
+    | 6-7 | B | | |
     """)
 
-# 篩選
+# 篩選條件
+st.markdown('<div class="filter-section">', unsafe_allow_html=True)
 col1, col2, col3 = st.columns(3)
 with col1:
     top_n = st.selectbox("顯示數量", [10, 20, 30, 50], index=1)
@@ -57,6 +133,7 @@ with col2:
 with col3:
     industry_options = ["全部"] + (df['industry'].unique().tolist() if 'industry' in df.columns else [])
     industry_filter = st.selectbox("產業別", industry_options)
+st.markdown('</div>', unsafe_allow_html=True)
 
 # 套用篩選
 filtered_df = df.copy()
@@ -102,7 +179,7 @@ else:
     result_df = display_df[display_cols].copy()
     
     column_names = {'stock_id': '代號', 'name': '名稱', 'industry': '產業', 'score': '評分',
-                    'roe': 'ROE(%)', 'pe': 'PE', 'pb': 'PB', 'dividend_yield': '殖利率(%)', 'debt_ratio': '負債率(%)'}
+                    'roe': 'ROE%(40%)', 'pe': 'PE(30%)', 'pb': 'PB(15%)', 'dividend_yield': '殖利率(%)', 'debt_ratio': '負債率%(15%)'}
     result_df = result_df.rename(columns=column_names)
     
     for col in result_df.select_dtypes(include=['float64']).columns:
@@ -110,13 +187,13 @@ else:
     
     st.dataframe(result_df, use_container_width=True, hide_index=True)
     
-    st.download_button("匯出 CSV", display_df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'),
+    st.download_button("📥 匯出 CSV", display_df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'),
                        f"top_{top_n}_stocks.csv", "text/csv")
     
     st.divider()
     
     # 圖表
-    st.subheader("分析圖表")
+    st.subheader("📈 分析圖表")
     col1, col2 = st.columns(2)
     
     with col1:
@@ -127,7 +204,8 @@ else:
             marker_color='#2563eb', text=top_10['score'].round(2), textposition='outside'
         ))
         fig.update_layout(title="Top 10 評分", xaxis_title="評分", yaxis=dict(autorange="reversed"),
-                         height=400, margin=dict(l=10, r=10, t=40, b=40))
+                         height=400, margin=dict(l=10, r=10, t=40, b=40),
+                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig, use_container_width=True)
     
     with col2:
@@ -135,11 +213,11 @@ else:
         fig = px.pie(values=grade_counts.values, names=grade_counts.index, title="等級分布", hole=0.4)
         fig.update_traces(textposition='inside', textinfo='percent+label',
                          marker=dict(colors=['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#9ca3af', '#d1d5db']))
-        fig.update_layout(showlegend=False)
+        fig.update_layout(showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig, use_container_width=True)
     
     # 個股明細
-    with st.expander("查看個股評分明細"):
+    with st.expander("🔍 查看個股評分明細"):
         selected = st.selectbox("選擇股票", display_df['stock_id'].tolist(),
                                format_func=lambda x: f"{x} - {display_df[display_df['stock_id']==x]['name'].values[0]}")
         if selected:

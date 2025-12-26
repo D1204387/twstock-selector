@@ -117,24 +117,34 @@ def fetch_stock_industry() -> Dict[str, str]:
     return industry_map
 
 
-def get_stock_list(force_refresh: bool = False) -> pd.DataFrame:
-    """取得所有上市櫃股票和 ETF 列表
+def get_stock_list(force_refresh: bool = False, core_only: bool = True) -> pd.DataFrame:
+    """取得股票列表
     
     Args:
         force_refresh: 是否強制重新取得資料
+        core_only: 是否只回傳精選 120 檔股票（預設 True）
     
     Returns:
-        包含所有股票的 DataFrame
+        包含股票的 DataFrame
     """
+    from .finmind_api import get_core_stocks_list
+    
     # 檢查快取
     if not force_refresh:
         cached = get_cache('stock_list')
         if cached:
-            return pd.DataFrame(cached)
+            df = pd.DataFrame(cached)
+            if core_only:
+                core_stocks = get_core_stocks_list()
+                df = df[df['stock_id'].isin(core_stocks)]
+            return df
         
         # 檢查資料庫
         df = get_all_stocks()
         if not df.empty:
+            if core_only:
+                core_stocks = get_core_stocks_list()
+                df = df[df['stock_id'].isin(core_stocks)]
             return df
     
     print("📊 正在取得股票列表...")
@@ -160,6 +170,12 @@ def get_stock_list(force_refresh: bool = False) -> pd.DataFrame:
         set_cache('stock_list', df.to_dict('records'), ttl_seconds=86400)
         
         print(f"✅ 已取得 {len(df)} 檔標的")
+    
+    # 過濾精選股票
+    if core_only:
+        core_stocks = get_core_stocks_list()
+        df = df[df['stock_id'].isin(core_stocks)]
+        print(f"📍 精選股票: {len(df)} 檔（涵蓋約 85% 市值）")
     
     return df
 
@@ -302,16 +318,30 @@ def update_all_financial_data(progress_callback=None):
 
 
 # 模擬資料生成（用於開發測試）
-def generate_sample_data(use_real_data: bool = True) -> pd.DataFrame:
+def generate_sample_data(use_real_data: bool = True, token: str = None) -> pd.DataFrame:
     """生成財務資料
     
     Args:
         use_real_data: 是否使用真實資料（精選股票）
+        token: FinMind API Token（可選，也會嘗試從環境變數讀取）
     
     Returns:
         包含財務指標的 DataFrame
     """
     import numpy as np
+    import os
+    
+    # 嘗試從環境變數或 .env 讀取 Token
+    if token is None:
+        try:
+            from dotenv import load_dotenv
+            from pathlib import Path
+            env_path = Path(__file__).parent.parent / '.env'
+            if env_path.exists():
+                load_dotenv(env_path)
+            token = os.getenv('FINMIND_TOKEN')
+        except ImportError:
+            pass
     
     df = get_stock_list()
     
@@ -321,7 +351,7 @@ def generate_sample_data(use_real_data: bool = True) -> pd.DataFrame:
     n = len(df)
     np.random.seed(42)
     
-    # 先為所有股票生成基礎隨機資料
+    # 先為所有股票生成基礎隨機資料（作為備用）
     df['roe'] = np.random.uniform(5, 30, n)
     df['roa'] = np.random.uniform(3, 15, n)
     df['net_profit_margin'] = np.random.uniform(5, 25, n)
@@ -339,32 +369,73 @@ def generate_sample_data(use_real_data: bool = True) -> pd.DataFrame:
     df['quick_ratio'] = np.random.uniform(60, 250, n)
     df['price'] = np.random.uniform(10, 500, n)
     
+    # 標記是否為真實資料
+    df['is_real_data'] = False
+    
     # 嘗試使用 FinMind 真實資料
     if use_real_data:
         try:
-            from .finmind_api import get_quick_financial_data, CORE_STOCKS
+            from .finmind_api import (
+                get_quick_financial_data, 
+                CORE_STOCKS,
+                fetch_all_indicators,
+                batch_fetch_indicators
+            )
             
             print("📊 載入 FinMind 真實資料...")
-            real_data = get_quick_financial_data()
             
-            if not real_data.empty:
-                # 更新精選股票的 PE/PB
-                for _, row in real_data.iterrows():
+            # 檢查是否有快取的完整資料
+            cache_dir = Path(__file__).parent.parent / "data" / "cache"
+            today = datetime.now().strftime('%Y%m%d')
+            cache_file = cache_dir / f"batch_indicators_{today}.csv"
+            
+            if cache_file.exists():
+                # 使用今日快取
+                print("📂 使用今日快取的完整財務資料")
+                cached_df = pd.read_csv(cache_file, encoding='utf-8-sig')
+                
+                for _, row in cached_df.iterrows():
                     stock_id = row.get('stock_id')
                     if stock_id in df['stock_id'].values:
                         idx = df[df['stock_id'] == stock_id].index[0]
-                        if row.get('pe') is not None:
-                            df.loc[idx, 'pe'] = row['pe']
-                        if row.get('pb') is not None:
-                            df.loc[idx, 'pb'] = row['pb']
+                        
+                        # 更新所有有效的指標
+                        for col in ['roe', 'roa', 'eps', 'net_profit_margin', 'gross_margin',
+                                   'operating_margin', 'debt_ratio', 'pe', 'pb', 
+                                   'dividend_yield', 'dividend_years', 'revenue_growth', 
+                                   'eps_growth', 'price']:
+                            if col in row and pd.notna(row[col]):
+                                df.loc[idx, col] = row[col]
+                        
+                        df.loc[idx, 'is_real_data'] = True
                 
-                print(f"✅ 已更新 {len(real_data)} 檔股票的真實 PE/PB 資料")
+                print(f"✅ 已更新 {len(cached_df)} 檔股票的真實資料")
+            else:
+                # 使用快速取得 PE/PB（基本版）
+                real_data = get_quick_financial_data(token)
+                
+                if not real_data.empty:
+                    for _, row in real_data.iterrows():
+                        stock_id = row.get('stock_id')
+                        if stock_id in df['stock_id'].values:
+                            idx = df[df['stock_id'] == stock_id].index[0]
+                            if row.get('pe') is not None:
+                                df.loc[idx, 'pe'] = row['pe']
+                            if row.get('pb') is not None:
+                                df.loc[idx, 'pb'] = row['pb']
+                            df.loc[idx, 'is_real_data'] = True
+                    
+                    print(f"✅ 已更新 {len(real_data)} 檔股票的真實 PE/PB 資料")
             
             # 標記精選股票
             df['is_core'] = df['stock_id'].isin(CORE_STOCKS)
             
         except Exception as e:
             print(f"⚠️ FinMind 資料載入失敗，使用模擬資料: {e}")
+    
+    # 統計真實資料比例
+    real_count = df['is_real_data'].sum()
+    print(f"📈 真實資料比例: {real_count}/{len(df)} ({real_count/len(df)*100:.1f}%)")
     
     # 四捨五入
     for col in df.select_dtypes(include=[np.number]).columns:
