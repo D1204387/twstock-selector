@@ -44,8 +44,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 側邊欄標題
-st.sidebar.markdown("### 🏠 首頁")
+# 側邊欄首頁連結
+if st.sidebar.button("🏠 首頁", use_container_width=True, type="primary"):
+    st.switch_page("main.py")
 st.sidebar.markdown("---")
 
 

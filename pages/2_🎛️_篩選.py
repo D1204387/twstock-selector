@@ -23,6 +23,14 @@ st.set_page_config(page_title="策略篩選 - 台股智選系統", page_icon="�
 # 套用 Glarity 風格
 st.markdown(GLARITY_STYLE, unsafe_allow_html=True)
 
+# 隱藏側邊欄的 "main" 標籤
+st.markdown('<style>[data-testid="stSidebarNav"] li:first-child { display: none; }</style>', unsafe_allow_html=True)
+
+# 側邊欄首頁連結
+if st.sidebar.button("🏠 首頁", use_container_width=True, type="primary", key="home_btn"):
+    st.switch_page("main.py")
+st.sidebar.markdown("---")
+
 # 額外的篩選頁樣式
 st.markdown("""
 <style>
