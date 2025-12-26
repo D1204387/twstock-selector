@@ -116,10 +116,23 @@ cols = st.columns(4)
 for i, (key, strategy) in enumerate(STRATEGIES.items()):
     with cols[i]:
         count = strategy_counts.get(key, 0)
+        # 生成條件標準文字
+        conditions = strategy.get('conditions', {})
+        criteria_list = []
+        for cond_key, cond_val in conditions.items():
+            if 'min' in cond_val and 'max' in cond_val:
+                criteria_list.append(f"{cond_key.upper()}: {cond_val['min']}-{cond_val['max']}")
+            elif 'min' in cond_val:
+                criteria_list.append(f"{cond_key.upper()} ≥ {cond_val['min']}")
+            elif 'max' in cond_val:
+                criteria_list.append(f"{cond_key.upper()} ≤ {cond_val['max']}")
+        criteria_text = " | ".join(criteria_list) if criteria_list else ""
+        
         st.markdown(f"""
         <div class="strategy-card">
             <h4>{strategy['name']}</h4>
             <div class="desc">{strategy['description']}</div>
+            <div class="criteria" style="font-size: 0.75rem; color: #6b7280; margin: 0.5rem 0;">{criteria_text}</div>
             <div class="count">{count} 檔</div>
         </div>
         """, unsafe_allow_html=True)
