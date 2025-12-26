@@ -100,13 +100,11 @@ def load_data():
 df = load_data()
 
 # 搜尋區塊
-st.markdown('<div class="card">', unsafe_allow_html=True)
 col1, col2 = st.columns([4, 1])
 with col1:
     keyword = st.text_input("搜尋", placeholder="輸入股票代號或公司名稱", label_visibility="collapsed")
 with col2:
     search_type = st.selectbox("範圍", ["全部", "股票", "ETF"], label_visibility="collapsed")
-st.markdown('</div>', unsafe_allow_html=True)
 
 if keyword:
     results = df[
