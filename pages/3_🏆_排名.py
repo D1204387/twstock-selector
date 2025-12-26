@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.data_fetcher import get_stock_list, generate_sample_data
 from src.stock_analyzer import calculate_score, get_top_stocks, get_score_grade
 from src.styles import GLARITY_STYLE
+from src.help_docs import SCORING_HELP
 
 st.set_page_config(page_title="排名 - 台股智選系統", page_icon="🏆", layout="wide")
 
@@ -90,46 +91,7 @@ df = load_data()
 
 # 評分說明
 with st.expander("📚 評分系統說明", expanded=False):
-    st.markdown("""
-    ### 📊 總評分公式
-    
-    **總分 = ROE分數×40% + PE分數×30% + PB分數×15% + 負債率分數×15%**
-    
-    ---
-    
-    ### 🔢 各指標評分方式（滿分 10 分）
-    
-    **1️⃣ ROE 評分（權重 40%）**
-    - 公式：ROE ÷ 3（最高 10 分）
-    - 範例：ROE = 21% → 21 ÷ 3 = 7 分
-    - 說明：ROE 30% 以上得滿分 10 分
-    
-    **2️⃣ PE 評分（權重 30%）**
-    - 公式：10 - (PE 與 15 的差距 ÷ 3)
-    - 範例：PE = 12 → 10 - |12-15|÷3 = 10 - 1 = 9 分
-    - 說明：PE 越接近 15 分數越高
-    
-    **3️⃣ PB 評分（權重 15%）**
-    - 公式：(3 - PB) × 3（最高 10 分）
-    - 範例：PB = 1.5 → (3-1.5)×3 = 4.5 分
-    - 說明：PB 越低分數越高，PB < 1 得滿分
-    
-    **4️⃣ 負債率評分（權重 15%）**
-    - 公式：(100 - 負債率) ÷ 10
-    - 範例：負債率 = 30% → (100-30)÷10 = 7 分
-    - 說明：負債率越低分數越高
-    
-    ---
-    
-    ### 🏆 等級對照表
-    
-    | 評分 | 等級 | 評分 | 等級 |
-    |------|------|------|------|
-    | 9-10 | A+ | 5-6 | C |
-    | 8-9 | A | 3-5 | D |
-    | 7-8 | B+ | 0-3 | F |
-    | 6-7 | B | | |
-    """)
+    st.markdown(SCORING_HELP)
 
 # 篩選條件
 st.markdown('<div class="filter-section">', unsafe_allow_html=True)
