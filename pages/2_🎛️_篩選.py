@@ -111,8 +111,14 @@ strategy_counts = get_strategy_matches_count(df)
 # ========== 快速策略區 ==========
 st.subheader("🚀 快速策略")
 
-# 策略卡片
+# 策略卡片 - 可點擊
 cols = st.columns(4)
+strategy_keys = list(STRATEGIES.keys())
+
+# 初始化 session state
+if 'selected_strategy' not in st.session_state:
+    st.session_state.selected_strategy = None
+
 for i, (key, strategy) in enumerate(STRATEGIES.items()):
     with cols[i]:
         count = strategy_counts.get(key, 0)
@@ -128,23 +134,38 @@ for i, (key, strategy) in enumerate(STRATEGIES.items()):
                 criteria_list.append(f"{cond_key.upper()} ≤ {cond_val['max']}")
         criteria_text = " | ".join(criteria_list) if criteria_list else ""
         
+        # 判斷是否為選中狀態
+        is_selected = st.session_state.selected_strategy == key
+        border_style = "border: 2px solid #2563eb;" if is_selected else ""
+        
         st.markdown(f"""
-        <div class="strategy-card">
+        <div class="strategy-card" style="min-height: 150px; {border_style}">
             <h4>{strategy['name']}</h4>
             <div class="desc">{strategy['description']}</div>
-            <div class="criteria" style="font-size: 0.75rem; color: #6b7280; margin: 0.5rem 0;">{criteria_text}</div>
+            <div class="criteria" style="font-size: 0.7rem; color: #6b7280; margin: 0.5rem 0; min-height: 2.5rem;">{criteria_text}</div>
             <div class="count">{count} 檔</div>
         </div>
         """, unsafe_allow_html=True)
+        
+        # 可點擊按鈕
+        if st.button(f"選擇", key=f"btn_{key}", use_container_width=True):
+            st.session_state.selected_strategy = key
+            st.rerun()
 
-# 策略選擇
-selected_strategy = st.radio(
-    "選擇策略",
-    [None] + list(STRATEGIES.keys()),
-    format_func=lambda x: "🔧 自訂篩選" if x is None else STRATEGIES[x]['name'],
-    horizontal=True,
-    label_visibility="collapsed"
-)
+# 自訂篩選按鈕
+st.markdown("")
+col_custom, col_clear = st.columns([1, 1])
+with col_custom:
+    if st.button("🔧 自訂篩選", use_container_width=True):
+        st.session_state.selected_strategy = None
+        st.rerun()
+with col_clear:
+    if st.session_state.selected_strategy:
+        if st.button("❌ 清除選擇", use_container_width=True):
+            st.session_state.selected_strategy = None
+            st.rerun()
+
+selected_strategy = st.session_state.selected_strategy
 
 st.divider()
 
