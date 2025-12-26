@@ -232,14 +232,12 @@ if keyword:
                 
                 # 優缺點
                 st.subheader("投資分析")
-                st.markdown('<div class="analysis-card">', unsafe_allow_html=True)
                 if analysis['strengths']:
                     for s in analysis['strengths']:
                         st.markdown(f"✅ {s}")
                 if analysis['weaknesses']:
                     for w in analysis['weaknesses']:
                         st.markdown(f"⚠️ {w}")
-                st.markdown('</div>', unsafe_allow_html=True)
 else:
     # 根據篩選器過濾資料
     filtered_df = df.copy()
