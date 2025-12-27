@@ -82,8 +82,8 @@ with st.sidebar:
     with st.expander("📚 快速說明"):
         st.markdown("""
         **關鍵指標**
-        - ROE > 15%：獲利能力佳
-        - PE 10-20：估值合理
+        - 權益報酬率 > 15%：獲利能力佳
+        - 本益比 10-20：估值合理
         - 殖利率 > 4%：高股息
         - 負債率 < 50%：財務穩健
         
@@ -225,7 +225,7 @@ if keyword:
                     ))
                 else:
                     # 一般股票雷達圖
-                    categories_radar = ['ROE', 'PE', 'PB', '負債率', '殖利率']
+                    categories_radar = ['權益報酬率', '本益比', '淨值比', '負債率', '殖利率']
                     roe_s = min(10, max(0, (stock.get('roe', 0) or 0) / 3))
                     pe = stock.get('pe', 15) or 15
                     pe_s = 10 - min(10, max(0, abs(pe - 15) / 3))
@@ -259,67 +259,62 @@ if keyword:
                     for w in analysis['weaknesses']:
                         st.markdown(f"⚠️ {w}")
 else:
-    # 根據篩選器過濾資料
-    filtered_df = df.copy()
-    if search_type == "股票" and 'asset_type' in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df['asset_type'] == 'stock']
-        st.subheader("🔥 評分最高股票")
-    elif search_type == "ETF" and 'asset_type' in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df['asset_type'] == 'etf']
-        st.subheader("🔥 評分最高 ETF")
-    else:
-        st.subheader("🔥 評分最高標的")
+    # 未輸入搜尋條件時，顯示使用指南
+    st.subheader("💡 使用指南")
     
-    st.caption("依綜合評分排序，點擊股票代號可搜尋詳細資訊")
+    col1, col2 = st.columns(2)
     
-    # 計算評分並排序
-    from src.stock_analyzer import calculate_score
-    if 'score' not in filtered_df.columns and 'roe' in filtered_df.columns:
-        filtered_df = calculate_score(filtered_df)
+    with col1:
+        st.markdown("""
+        ### 🔍 搜尋方式
+        
+        **股票代號搜尋**
+        - 輸入股票代號如 `2330`、`2317`
+        - 支援部分代號搜尋
+        
+        **公司名稱搜尋**
+        - 輸入公司名稱如 `台積電`、`鴻海`
+        - 支援模糊搜尋
+        
+        **ETF 搜尋**
+        - 輸入 ETF 代號如 `0050`、`0056`
+        - 在下拉選單選擇「ETF」可過濾
+        """)
     
-    # 按評分排序
-    if 'score' in filtered_df.columns:
-        filtered_df = filtered_df.sort_values('score', ascending=False)
+    with col2:
+        st.markdown("""
+        ### 📊 功能說明
+        
+        **詳細資訊**
+        - 查看股票的財務指標
+        - 雷達圖顯示各項評分
+        - 優缺點分析
+        
+        **快速連結**
+        - 🏆 **[排名](/🏆_排名)** - 查看評分最高的股票
+        - 🎛️ **[篩選](/🎛️_篩選)** - 自訂條件篩選
+        - 🤖 **[AI 選股](/🤖_AI智慧選股)** - 用自然語言查詢
+        """)
     
-    # 顯示設定
-    total_count = len(filtered_df)
-    col_a, col_b = st.columns([1, 3])
-    with col_a:
-        display_mode = st.selectbox("顯示方式", ["分頁", "全部"], key="search_display_mode", label_visibility="collapsed")
-    with col_b:
-        if display_mode == "分頁":
-            page_size = st.selectbox("每頁筆數", [15, 30, 50], index=0, key="search_page_size", label_visibility="collapsed")
-        else:
-            page_size = total_count
+    st.divider()
     
-    # 分頁邏輯
-    total_pages = max((total_count + page_size - 1) // page_size, 1) if page_size > 0 else 1
+    # 顯示資料庫統計
+    st.subheader("📈 資料庫概況")
     
-    if display_mode == "分頁" and total_pages > 1:
-        page = st.number_input(f"頁數 (共 {total_pages} 頁)", min_value=1, max_value=total_pages, value=1, step=1, key="search_page")
-        start_idx = (page - 1) * page_size
-        end_idx = min(start_idx + page_size, total_count)
-        st.caption(f"顯示第 {start_idx + 1} - {end_idx} 筆，共 {total_count} 檔{search_type if search_type != '全部' else '標的'}")
-    else:
-        start_idx = 0
-        end_idx = total_count
-        st.caption(f"顯示全部 {total_count} 檔{search_type if search_type != '全部' else '標的'}")
+    total = len(df)
+    stocks = len(df[df['asset_type'] == 'stock']) if 'asset_type' in df.columns else total
+    etfs = len(df[df['asset_type'] == 'etf']) if 'asset_type' in df.columns else 0
     
-    # 顯示篩選後的資料
-    display_cols = ['stock_id', 'name', 'price', 'score', 'roe', 'pe', 'dividend_yield']
-    display_cols = [c for c in display_cols if c in filtered_df.columns]
-    display_df = filtered_df[display_cols].iloc[start_idx:end_idx].copy()
+    col_a, col_b, col_c = st.columns(3)
+    col_a.metric("總標的數", f"{total} 檔")
+    col_b.metric("股票", f"{stocks} 檔")
+    col_c.metric("ETF", f"{etfs} 檔")
     
-    # 加入序號欄位
-    display_df.insert(0, '序號', range(start_idx + 1, end_idx + 1))
-    
-    column_names = {
-        'stock_id': '代號', 'name': '名稱', 'price': '股價', 'score': '評分',
-        'roe': 'ROE%(40%)', 'pe': 'PE(30%)', 'dividend_yield': '殖利率(%)'
-    }
-    display_df = display_df.rename(columns=column_names)
-    
-    for col in display_df.select_dtypes(include=['float64']).columns:
-        display_df[col] = display_df[col].round(2)
-    
-    st.dataframe(display_df, use_container_width=True, hide_index=True)
+    # 熱門搜尋建議
+    st.subheader("🔥 熱門股票")
+    popular_stocks = df.nlargest(5, 'score')[['stock_id', 'name', 'score']].values.tolist() if 'score' in df.columns else []
+    if popular_stocks:
+        cols = st.columns(5)
+        for i, (sid, name, score) in enumerate(popular_stocks):
+            with cols[i]:
+                st.button(f"{sid} {name}", key=f"popular_{sid}", help=f"評分: {score:.1f}")

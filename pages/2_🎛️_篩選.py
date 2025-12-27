@@ -125,7 +125,7 @@ for i, (key, strategy) in enumerate(STRATEGIES.items()):
         criteria_list = []
         # 簡易中文對照表
         display_map = {
-            'roe': 'ROE', 'pe': 'PE', 'pb': 'PB', 'eps': 'EPS',
+            'roe': '權益報酬率', 'pe': '本益比', 'pb': '淨值比', 'eps': '每股盈餘',
             'dividend_yield': '殖利率', 'dividend_years': '配息年數',
             'debt_ratio': '負債率'
         }
@@ -236,7 +236,7 @@ else:
     col1, col2 = st.columns([3, 1])
     with col1:
         sort_by = st.selectbox("排序依據", ['score', 'roe', 'pe', 'dividend_yield'], 
-                               format_func=lambda x: {'score': '評分', 'roe': 'ROE', 'pe': 'PE', 'dividend_yield': '殖利率'}[x],
+                               format_func=lambda x: {'score': '評分', 'roe': '權益報酬率', 'pe': '本益比', 'dividend_yield': '殖利率'}[x],
                                label_visibility="collapsed")
     with col2:
         sort_asc = st.selectbox("順序", ["降冪", "升冪"], label_visibility="collapsed") == "升冪"
@@ -276,14 +276,14 @@ else:
     display_df.insert(0, '序號', range(start_idx + 1, end_idx + 1))
     
     column_names = {'stock_id': '代號', 'name': '名稱', 'price': '股價', 'score': '評分',
-                    'roe': 'ROE%', 'pe': 'PE', 'pb': 'PB', 'dividend_yield': '殖利率%', 'debt_ratio': '負債率%'}
+                    'roe': '權益報酬率%', 'pe': '本益比', 'pb': '淨值比', 'dividend_yield': '殖利率%', 'debt_ratio': '負債率%'}
     display_df = display_df.rename(columns=column_names)
     
     for col in display_df.select_dtypes(include=['float64']).columns:
         display_df[col] = display_df[col].round(2)
     
     # 評分權重說明
-    st.caption("📊 **評分權重** — 一般股票：ROE 40% + PE 30% + PB 15% + 負債率 15% ｜ ETF：殖利率 70% + PB 30%")
+    st.caption("📊 **評分權重** — 一般股票：ROE 40% + PE 30% + PB 15% + 負債率 15% ｜ ETF：殖利率 80% + 配息年數 20%")
     
     st.dataframe(display_df, use_container_width=True, hide_index=True)
     

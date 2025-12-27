@@ -149,14 +149,14 @@ else:
     result_df = display_df[display_cols].copy()
     
     column_names = {'stock_id': '代號', 'name': '名稱', 'price': '股價', 'score': '評分',
-                    'roe': 'ROE%', 'pe': 'PE', 'pb': 'PB', 'dividend_yield': '殖利率%', 'debt_ratio': '負債率%'}
+                    'roe': '權益報酬率%', 'pe': '本益比', 'pb': '淨值比', 'dividend_yield': '殖利率%', 'debt_ratio': '負債率%'}
     result_df = result_df.rename(columns=column_names)
     
     for col in result_df.select_dtypes(include=['float64']).columns:
         result_df[col] = result_df[col].round(2)
     
     # 評分權重說明
-    st.caption("📊 **評分權重** — 一般股票：ROE 40% + PE 30% + PB 15% + 負債率 15% ｜ ETF：殖利率 70% + PB 30%")
+    st.caption("📊 **評分權重** — 一般股票：ROE 40% + PE 30% + PB 15% + 負債率 15% ｜ ETF：殖利率 80% + 配息年數 20%")
     
     st.dataframe(result_df, use_container_width=True, hide_index=True)
     

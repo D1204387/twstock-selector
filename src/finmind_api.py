@@ -735,7 +735,8 @@ def fetch_indicators_lite(stock_id: str, token: str = None) -> Dict:
         # 暫存計算用的原始數據
         raw_data = {
             'NetIncome': None, 'Revenue': None, 'Equity': None,
-            'GrossProfit': None, 'OperatingIncome': None
+            'GrossProfit': None, 'OperatingIncome': None,
+            'TotalLiabilities': None, 'TotalAssets': None  # 用於計算負債率
         }
 
         for _, row in latest.iterrows():
@@ -833,10 +834,37 @@ def fetch_indicators_lite(stock_id: str, token: str = None) -> Dict:
         if result['gross_margin'] is None and raw_data['GrossProfit'] and raw_data['Revenue'] and raw_data['Revenue'] != 0:
             result['gross_margin'] = round((raw_data['GrossProfit'] / raw_data['Revenue']) * 100, 2)
             
-        # 4. 負債比率 = TotalLiabilities / TotalAssets
+        # 4. 負債比率 = TotalLiabilities / TotalAssets (從 FinancialStatements 嘗試)
         if result['debt_ratio'] is None and raw_data.get('TotalLiabilities') and raw_data.get('TotalAssets') and raw_data.get('TotalAssets') != 0:
             result['debt_ratio'] = round((raw_data['TotalLiabilities'] / raw_data['TotalAssets']) * 100, 2)
 
+    time.sleep(0.15)
+    
+    # === 請求 4: 資產負債表 (TaiwanStockBalanceSheet) - 用於負債率 ===
+    if result['debt_ratio'] is None:
+        df_bs = get_finmind_data("TaiwanStockBalanceSheet", stock_id, start_date, end_date, token)
+        if not df_bs.empty:
+            latest_date = df_bs['date'].max()
+            latest = df_bs[df_bs['date'] == latest_date]
+            
+            total_assets = None
+            total_liabilities = None
+            
+            for _, row in latest.iterrows():
+                item_type = str(row.get('type', '')).lower()
+                try:
+                    val = float(row.get('value')) if row.get('value') is not None else None
+                except:
+                    val = None
+                
+                if val is not None:
+                    if item_type == 'totalassets':
+                        total_assets = val
+                    elif item_type == 'liabilities':
+                        total_liabilities = val
+            
+            if total_assets and total_liabilities and total_assets != 0:
+                result['debt_ratio'] = round((total_liabilities / total_assets) * 100, 2)
 
     return result
 

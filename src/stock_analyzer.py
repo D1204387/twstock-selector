@@ -41,6 +41,7 @@ def calculate_score(df: pd.DataFrame, weights: Dict = None) -> pd.DataFrame:
     result['pb_score'] = 0.0
     result['debt_score'] = 0.0
     result['dividend_score'] = 0.0
+    result['dividend_years_score'] = 0.0  # 新增配息年數評分
     
     # 預計算各項分數 function (vectorized apply)
     if 'roe' in result.columns:
@@ -53,18 +54,30 @@ def calculate_score(df: pd.DataFrame, weights: Dict = None) -> pd.DataFrame:
         result['debt_score'] = result['debt_ratio'].apply(lambda x: score_debt_ratio(x))
     if 'dividend_yield' in result.columns:
         result['dividend_score'] = result['dividend_yield'].apply(lambda x: score_dividend_yield(x))
+    if 'dividend_years' in result.columns:
+        result['dividend_years_score'] = result['dividend_years'].apply(lambda x: score_dividend_years(x))
         
     def calculate_single_score(row):
         stock_id = str(row.get('stock_id', ''))
         is_etf = stock_id.startswith('00')
         
         if is_etf:
-            # ETF 評分邏輯 (專注於 殖利率 + PB)
-            etf_weights = ETF_SCORING_WEIGHTS
-            score = (
-                row['dividend_score'] * etf_weights.get('dividend_yield', 0.7) +
-                row['pb_score'] * etf_weights.get('pb', 0.3)
-            )
+            # ETF 動態評分邏輯
+            pb_value = row.get('pb', None)
+            has_valid_pb = pb_value is not None and not pd.isna(pb_value) and pb_value > 0
+            
+            if has_valid_pb:
+                # PB 有值：殖利率 70% + PB 30%
+                score = (
+                    row['dividend_score'] * 0.7 +
+                    row['pb_score'] * 0.3
+                )
+            else:
+                # PB 無值：殖利率 80% + 配息年數 20%
+                score = (
+                    row['dividend_score'] * 0.8 +
+                    row['dividend_years_score'] * 0.2
+                )
         else:
             # 一般股票評分邏輯
             w = weights
@@ -185,6 +198,26 @@ def score_dividend_yield(dy: float) -> float:
         return 9
     else:
         return 10
+
+
+def score_dividend_years(years: int) -> float:
+    """配息年數評分函數（連續配息穩定度）"""
+    if years is None or pd.isna(years):
+        return 0
+    
+    years = int(years)
+    if years <= 0:
+        return 0
+    elif years < 2:
+        return 2
+    elif years < 3:
+        return 4
+    elif years < 5:
+        return 6
+    elif years < 7:
+        return 8
+    else:
+        return 10  # 7年以上滿分
 
 
 def get_top_stocks(df: pd.DataFrame, n: int = 20, weights: Dict = None) -> pd.DataFrame:
