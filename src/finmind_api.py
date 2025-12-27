@@ -4,7 +4,7 @@ Taiwan Stock Selection System - FinMind API Module
 
 使用 FinMind API 取得真實財務資料
 免費額度：約 300-600 次/日
-策略：只取得精選 150 檔核心股票
+策略：只取得精選 120 檔核心股票
 """
 
 import requests
@@ -107,7 +107,6 @@ def fetch_stock_financial_statement(stock_id: str, token: str = None) -> Dict:
         'operating_margin': None,
         'eps': None,
         'debt_ratio': None,
-        'current_ratio': None,
         'revenue_growth': None,
     }
     
@@ -802,9 +801,29 @@ def fetch_indicators_lite(stock_id: str, token: str = None) -> Dict:
         # 1. ROE 補救策略 A: NetIncome / Equity (如果策略 B 失敗)
         if result['roe'] is None and raw_data['NetIncome'] and raw_data['Equity'] and raw_data['Equity'] != 0:
             current_roe = (raw_data['NetIncome'] / raw_data['Equity']) * 100
-             # 簡單年化：若是 Q1~Q3 累計，這裡簡化視為單季或累計處理
-             # FinMind 回傳的 IncomeAfterTaxes 在 FinancialStatements 通常是單季
-            result['roe'] = round(current_roe * 4, 2)
+            # 年化處理：根據季度判斷
+            # FinMind FinancialStatements 的 IncomeAfterTaxes 可能是單季或累計值
+            # 最安全的做法是根據 quarter 來決定年化倍數
+            if quarter:
+                if quarter == 4:
+                    # Q4 財報 = 全年數據，不需年化
+                    result['roe'] = round(current_roe, 2)
+                else:
+                    # Q1/Q2/Q3 財報 = 累計值，需年化 (除以季數再乘4)
+                    result['roe'] = round(current_roe / quarter * 4, 2)
+            else:
+                # 無法判斷季度時，保守處理：不年化，直接使用原值
+                # 避免錯誤年化導致 ROE 異常偏高
+                result['roe'] = round(current_roe, 2)
+
+        # === ROE 合理性檢查 ===
+        # 1. 極端值過濾：ROE 超過 ±100% 視為異常，設為 None
+        if result['roe'] is not None:
+            if result['roe'] > 100 or result['roe'] < -100:
+                result['roe'] = None
+            # 2. 邏輯矛盾檢查：EPS 為負但 ROE 為正（且 > 20%），視為計算錯誤
+            elif result['eps'] is not None and result['eps'] < 0 and result['roe'] > 20:
+                result['roe'] = None
 
         # 2. 淨利率 = NetIncome / Revenue
         if result['net_profit_margin'] is None and raw_data['NetIncome'] and raw_data['Revenue'] and raw_data['Revenue'] != 0:
@@ -818,25 +837,6 @@ def fetch_indicators_lite(stock_id: str, token: str = None) -> Dict:
         if result['debt_ratio'] is None and raw_data.get('TotalLiabilities') and raw_data.get('TotalAssets') and raw_data.get('TotalAssets') != 0:
             result['debt_ratio'] = round((raw_data['TotalLiabilities'] / raw_data['TotalAssets']) * 100, 2)
 
-
-        # 5. 流動比率 & 速動比率 (需從 BalanceSheet 抓取)
-        # 由於 fetch_indicators_lite 只抓 FinancialStatements (綜合損益表)，
-        # 這裡只能嘗試從現有欄位找。若 FinMind 的 FinancialStatements 包含資產負債項目則可算，
-        # 否則這是 Lite 版的限制。
-        # 經過 debug_roe 確認，FinancialStatements 只有損益項目，無資產負債細項 (除了權益)。
-        # 因此 Lite 版無法計算流動/速動比率。
-        # 解決方案：設為 None 或後續考慮加抓 BalanceSheet (會增加 API call)。
-        # 為了效能，Lite 版暫時不抓 BalanceSheet。
-        
-        # 6. 成長率計算 (需要同期比較)
-        # Lite 版只抓了最近一季，無法計算 YoY。
-        # 若要算，需由前端資料庫比較不同季度的資料，或在此處多抓一年資料。
-        # 考量效能，這裡先設為 None，或在 batch_processing 時處理。
-        
-        # 為了滿足 15 項指標的承諾，我們必須在 Lite 版做取捨，
-        # 或者在這裡偷抓上一季資料來算 YoY (API call 不變，只是 start_date 拉長)。
-        
-        pass
 
     return result
 

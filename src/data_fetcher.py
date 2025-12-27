@@ -348,8 +348,6 @@ def generate_sample_data(use_real_data: bool = True, token: str = None) -> pd.Da
     df['eps_growth'] = np.random.uniform(-20, 50, n)
     df['dividend_years'] = np.random.randint(0, 15, n)
     df['debt_ratio'] = np.random.uniform(20, 70, n)
-    df['current_ratio'] = np.random.uniform(80, 300, n)
-    df['quick_ratio'] = np.random.uniform(60, 250, n)
     df['price'] = np.random.uniform(10, 500, n)
     
     # 標記是否為真實資料

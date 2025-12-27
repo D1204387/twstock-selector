@@ -27,7 +27,6 @@ SYSTEM_PROMPT = """你是一個台股選股助手，專門幫助用戶將口語�
 - revenue_growth: 營收成長率 (%)，正值表示成長
 - eps_growth: EPS成長率 (%)，正值表示成長
 - net_profit_margin: 淨利率 (%)，越高越好
-- current_ratio: 流動比率 (%)，>100% 較安全
 
 你需要將用戶的查詢轉換為 JSON 格式的篩選條件。
 
@@ -134,107 +133,143 @@ def parse_query_fallback(query: str) -> Dict:
     
     query_lower = query.lower()
     
-    # 股息/殖利率相關
-    if any(k in query for k in ["利息", "股息", "殖利率", "配息", "存股"]):
-        nums = re.findall(r'(\d+(?:\.\d+)?)\s*%?', query)
-        if nums:
-            filters['dividend_yield'] = {'min': float(nums[0])}
-            explanation = f"篩選殖利率超過 {nums[0]}% 的股票"
+    # === 完整的中英文指標映射表 ===
+    INDICATOR_KEYWORDS = {
+        'roe': ['roe', '股東權益報酬率', '股東報酬率', '權益報酬'],
+        'roa': ['roa', '資產報酬率', '資產回報率'],
+        'pe': ['pe', 'p/e', '本益比', '市盈率'],
+        'pb': ['pb', 'p/b', '股價淨值比', '淨值比', '市淨率'],
+        'eps': ['eps', '每股盈餘', '每股獲利'],
+        'dividend_yield': ['殖利率', '股息率', '配息率', '現金殖利率', '股利率'],
+        'dividend_years': ['配息年數', '連續配息', '配息紀錄'],
+        'debt_ratio': ['負債率', '負債比', '負債比率', '槓桿'],
+        'net_profit_margin': ['淨利率', '淨利潤率', '純益率'],
+        'gross_margin': ['毛利率', '毛利'],
+        'operating_margin': ['營業利益率', '營益率', '營業利潤率'],
+    }
+    
+    # === 尋找查詢中提到的指標 ===
+    def find_indicator(text):
+        text_lower = text.lower()
+        for indicator, keywords in INDICATOR_KEYWORDS.items():
+            for kw in keywords:
+                if kw in text_lower:
+                    return indicator
+        return None
+    
+    # === 提取數值 ===
+    def extract_number(text):
+        nums = re.findall(r'(\d+(?:\.\d+)?)\s*%?', text)
+        return float(nums[0]) if nums else None
+    
+    # === 判斷是要大於還是小於 ===
+    def is_less_than(text):
+        return any(k in text for k in ['低', '小', '少', '以下', '不超過', '低於', '小於'])
+    
+    # === 策略關鍵詞 ===
+    STRATEGY_KEYWORDS = {
+        'dividend': ['利息', '股息', '殖利率', '配息', '存股', '領息', '被動收入', '現金流'],
+        'growth': ['成長', '成長性', '增長', '擴張', '高成長', '飆股', '潛力'],
+        'value': ['便宜', '低估', '價值', '撿便宜', '被低估', '俗', '划算'],
+        'quality': ['優質', '好公司', '績優', '龍頭', '穩健', '安全', '保守', '低風險', '藍籌'],
+    }
+    
+    # === 主邏輯：先嘗試識別具體指標 ===
+    found_indicator = find_indicator(query)
+    num = extract_number(query)
+    
+    if found_indicator:
+        # 用戶指定了具體指標
+        if found_indicator in ['pe', 'pb', 'debt_ratio']:
+            # 這些指標通常「越低越好」
+            if num:
+                if is_less_than(query):
+                    filters[found_indicator] = {'max': num}
+                    explanation = f"篩選 {found_indicator.upper()} 低於 {num} 的股票"
+                else:
+                    filters[found_indicator] = {'max': num}  # 預設也是低於
+                    explanation = f"篩選 {found_indicator.upper()} 低於 {num} 的股票"
+            else:
+                # 使用預設值
+                defaults = {'pe': 15, 'pb': 2, 'debt_ratio': 50}
+                filters[found_indicator] = {'max': defaults.get(found_indicator, 50)}
+                explanation = f"篩選 {found_indicator.upper()} 較低的股票"
+        else:
+            # 其他指標通常「越高越好」
+            if num:
+                if is_less_than(query):
+                    filters[found_indicator] = {'max': num}
+                    explanation = f"篩選 {found_indicator.upper()} 低於 {num} 的股票"
+                else:
+                    filters[found_indicator] = {'min': num}
+                    explanation = f"篩選 {found_indicator.upper()} 超過 {num} 的股票"
+            else:
+                # 使用預設值
+                defaults = {'roe': 15, 'roa': 8, 'dividend_yield': 5, 'dividend_years': 5, 
+                           'net_profit_margin': 10, 'gross_margin': 20, 'operating_margin': 10, 'eps': 3}
+                filters[found_indicator] = {'min': defaults.get(found_indicator, 10)}
+                explanation = f"篩選 {found_indicator.upper()} 較高的股票"
+    
+    # === 若未識別到具體指標，嘗試識別策略 ===
+    elif any(k in query for k in STRATEGY_KEYWORDS['dividend']):
+        if num:
+            filters['dividend_yield'] = {'min': num}
+            explanation = f"篩選殖利率超過 {num}% 的股票"
         else:
             filters['dividend_yield'] = {'min': 5}
             explanation = "篩選殖利率超過 5% 的高股息股票"
         strategy = "dividend"
     
-    # 成長相關
-    elif any(k in query for k in ["成長", "成長性", "增長", "擴張"]):
-        filters['revenue_growth'] = {'min': 10}
-        filters['eps_growth'] = {'min': 15}
+    elif any(k in query for k in STRATEGY_KEYWORDS['growth']):
         filters['roe'] = {'min': 15}
         strategy = "growth"
-        explanation = "篩選營收成長 > 10% 且 EPS 成長 > 15% 的成長股"
+        explanation = "篩選 ROE > 15% 的成長股"
     
-    # 價值/低估相關
-    elif any(k in query for k in ["便宜", "低估", "價值", "撿便宜"]):
+    elif any(k in query for k in STRATEGY_KEYWORDS['value']):
         filters['pe'] = {'max': 15}
         filters['pb'] = {'max': 2}
         filters['roe'] = {'min': 10}
         strategy = "value"
         explanation = "篩選 PE < 15、PB < 2 且 ROE > 10% 的價值股"
     
-    # 安全/穩健相關
-    elif any(k in query for k in ["安全", "穩健", "保守", "低風險"]):
+    elif any(k in query for k in STRATEGY_KEYWORDS['quality']):
+        filters['roe'] = {'min': 15}
         filters['debt_ratio'] = {'max': 40}
-        filters['current_ratio'] = {'min': 150}
         filters['dividend_years'] = {'min': 5}
         strategy = "quality"
-        explanation = "篩選負債率 < 40% 且連續配息 > 5 年的穩健股"
+        explanation = "篩選 ROE > 15%、負債率 < 40% 的優質股"
     
-    # 優質/好公司
-    elif any(k in query for k in ["優質", "好公司", "績優", "龍頭"]):
-        filters['roe'] = {'min': 15}
-        filters['pe'] = {'min': 10, 'max': 25}
-        filters['debt_ratio'] = {'max': 50}
-        strategy = "quality"
-        explanation = "篩選 ROE > 15%、PE 合理、負債率低的優質股"
+    # === ETF 專用查詢 ===
+    elif any(k in query for k in ['etf', 'ETF', '指數型', '被動投資']):
+        filters['dividend_yield'] = {'min': 4}
+        strategy = "dividend"
+        explanation = "篩選殖利率 > 4% 的 ETF"
     
-    # ROE 相關
-    elif "roe" in query_lower or "股東權益" in query:
-        nums = re.findall(r'(\d+(?:\.\d+)?)\s*%?', query)
-        if nums:
-            filters['roe'] = {'min': float(nums[0])}
-            explanation = f"篩選 ROE 超過 {nums[0]}% 的股票"
-        else:
-            filters['roe'] = {'min': 15}
-            explanation = "篩選 ROE 超過 15% 的股票"
-    
-    # PE 相關
-    elif "pe" in query_lower or "本益比" in query:
-        nums = re.findall(r'(\d+(?:\.\d+)?)', query)
-        if nums:
-            if "低" in query or "小" in query:
-                filters['pe'] = {'max': float(nums[0])}
-                explanation = f"篩選 PE 低於 {nums[0]} 的股票"
-            else:
-                filters['pe'] = {'min': float(nums[0])}
-                explanation = f"篩選 PE 高於 {nums[0]} 的股票"
-        else:
-            filters['pe'] = {'max': 15}
-            explanation = "篩選 PE 低於 15 的低估股票"
-    
-    # 負債相關
-    elif any(k in query for k in ["負債", "財務"]):
-        nums = re.findall(r'(\d+(?:\.\d+)?)\s*%?', query)
-        if nums:
-            filters['debt_ratio'] = {'max': float(nums[0])}
-            explanation = f"篩選負債率低於 {nums[0]}% 的股票"
-        else:
-            filters['debt_ratio'] = {'max': 50}
-            explanation = "篩選負債率低於 50% 的股票"
-    
-    # 預設
+    # === 預設 ===
     else:
         filters['roe'] = {'min': 10}
         filters['pe'] = {'max': 25}
         explanation = "篩選基本條件良好的股票（ROE > 10%、PE < 25）"
     
-    # 產業別識別（可與其他條件組合）
+    # === 產業別識別（可與其他條件組合）===
     industry = None
-    if any(k in query for k in ["半導體", "晶片", "IC"]):
-        industry = "半導體"
-    elif any(k in query for k in ["金融", "銀行", "壽險", "保險"]):
-        industry = "金融保險"
-    elif any(k in query for k in ["科技", "電子", "電腦"]):
-        industry = "電子"  # 通用電子類
-    elif any(k in query for k in ["航運", "海運", "貨運"]):
-        industry = "航運"
-    elif any(k in query for k in ["生技", "醫療", "製藥"]):
-        industry = "生技醫療"
-    elif any(k in query for k in ["食品", "飲料"]):
-        industry = "食品"
-    elif any(k in query for k in ["鋼鐵", "金屬"]):
-        industry = "鋼鐵"
-    elif any(k in query for k in ["營建", "建設", "房地產"]):
-        industry = "建材營造"
+    INDUSTRY_KEYWORDS = {
+        '半導體': ['半導體', '晶片', 'IC', '晶圓', '封測'],
+        '金融保險': ['金融', '銀行', '壽險', '保險', '證券', '金控'],
+        '電子': ['科技', '電子', '電腦', '資訊', '軟體'],
+        '航運': ['航運', '海運', '貨運', '物流'],
+        '生技醫療': ['生技', '醫療', '製藥', '醫藥', '生醫'],
+        '食品': ['食品', '飲料', '餐飲'],
+        '鋼鐵': ['鋼鐵', '金屬', '鋁', '銅'],
+        '建材營造': ['營建', '建設', '房地產', '建材', '水泥'],
+        '通訊網路': ['電信', '通訊', '5G', '網路'],
+        '汽車': ['汽車', '車用', '電動車'],
+    }
+    
+    for ind_name, keywords in INDUSTRY_KEYWORDS.items():
+        if any(k in query for k in keywords):
+            industry = ind_name
+            break
     
     if industry:
         explanation += f"（限 {industry} 產業）"

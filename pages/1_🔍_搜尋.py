@@ -204,23 +204,45 @@ if keyword:
             with col2:
                 st.subheader("指標雷達圖")
                 
-                categories_radar = ['ROE', 'PE', 'PB', '負債率', '殖利率']
-                roe_s = min(10, max(0, (stock.get('roe', 0) or 0) / 3))
-                pe = stock.get('pe', 15) or 15
-                pe_s = 10 - min(10, max(0, abs(pe - 15) / 3))
-                pb = stock.get('pb', 2) or 2
-                pb_s = min(10, max(0, (3 - pb) * 3))
-                debt_s = min(10, max(0, (100 - (stock.get('debt_ratio', 50) or 50)) / 10))
-                div_s = min(10, max(0, (stock.get('dividend_yield', 0) or 0) * 2))
+                # 判斷是否為 ETF
+                is_etf = str(stock.get('stock_id', '')).startswith('00')
                 
-                fig = go.Figure()
-                fig.add_trace(go.Scatterpolar(
-                    r=[roe_s, pe_s, pb_s, debt_s, div_s],
-                    theta=categories_radar,
-                    fill='toself',
-                    fillcolor='rgba(37, 99, 235, 0.2)',
-                    line_color='#2563eb'
-                ))
+                if is_etf:
+                    # ETF 專用雷達圖：殖利率、PB、配息年數
+                    categories_radar = ['殖利率', 'PB', '配息年數']
+                    div_s = min(10, max(0, (stock.get('dividend_yield', 0) or 0) * 1.5))  # 7% = 10分
+                    pb = stock.get('pb', 1.5) or 1.5
+                    pb_s = min(10, max(0, (2 - pb) * 5))  # PB=0 得 10分, PB=2 得 0分
+                    years_s = min(10, max(0, (stock.get('dividend_years', 0) or 0) * 2))  # 5年 = 10分
+                    
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatterpolar(
+                        r=[div_s, pb_s, years_s],
+                        theta=categories_radar,
+                        fill='toself',
+                        fillcolor='rgba(16, 185, 129, 0.2)',  # 綠色調 for ETF
+                        line_color='#10b981'
+                    ))
+                else:
+                    # 一般股票雷達圖
+                    categories_radar = ['ROE', 'PE', 'PB', '負債率', '殖利率']
+                    roe_s = min(10, max(0, (stock.get('roe', 0) or 0) / 3))
+                    pe = stock.get('pe', 15) or 15
+                    pe_s = 10 - min(10, max(0, abs(pe - 15) / 3))
+                    pb = stock.get('pb', 2) or 2
+                    pb_s = min(10, max(0, (3 - pb) * 3))
+                    debt_s = min(10, max(0, (100 - (stock.get('debt_ratio', 50) or 50)) / 10))
+                    div_s = min(10, max(0, (stock.get('dividend_yield', 0) or 0) * 2))
+                    
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatterpolar(
+                        r=[roe_s, pe_s, pb_s, debt_s, div_s],
+                        theta=categories_radar,
+                        fill='toself',
+                        fillcolor='rgba(37, 99, 235, 0.2)',
+                        line_color='#2563eb'
+                    ))
+                
                 fig.update_layout(
                     polar=dict(radialaxis=dict(visible=True, range=[0, 10], gridcolor='#e5e7eb')),
                     showlegend=False, height=300, margin=dict(l=40, r=40, t=20, b=20),

@@ -84,20 +84,6 @@ def calculate_debt_ratio(total_debt: float, total_assets: float) -> Optional[flo
     return None
 
 
-def calculate_current_ratio(current_assets: float, current_liabilities: float) -> Optional[float]:
-    """計算流動比率"""
-    if current_liabilities and current_liabilities != 0:
-        return round((current_assets / current_liabilities) * 100, 2)
-    return None
-
-
-def calculate_quick_ratio(current_assets: float, inventory: float, current_liabilities: float) -> Optional[float]:
-    """計算速動比率"""
-    if current_liabilities and current_liabilities != 0:
-        return round(((current_assets - inventory) / current_liabilities) * 100, 2)
-    return None
-
-
 def get_indicator_info(indicator_key: str) -> Dict:
     """取得指標詳細資訊"""
     return INDICATORS.get(indicator_key, {})

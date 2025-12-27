@@ -157,7 +157,7 @@ STRATEGIES = {
         "conditions": {
             "roe": {"min": 20},              # 高 ROE 代替成長率
             "net_profit_margin": {"min": 20}, # 高淨利
-            "dept_ratio": {"max": 50}
+            "debt_ratio": {"max": 50}
         }
     },
     "value": {
