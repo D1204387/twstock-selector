@@ -213,5 +213,10 @@ GLARITY_STYLE = """
         border-radius: 8px;
         padding: 0.5rem;
     }
+    
+    /* 隱藏標題的連結錨點（迴紋針符號） */
+    a.anchor-link {
+        display: none !important;
+    }
 </style>
 """

@@ -109,28 +109,6 @@ INDICATORS = {
     },
     
     # 成長性指標
-    "revenue_growth": {
-        "name": "營收成長率",
-        "full_name": "營收年增率",
-        "description": "今年營收相較去年的成長幅度",
-        "formula": "(今年營收 - 去年營收) / 去年營收 × 100%",
-        "ideal_min": 10,
-        "ideal_max": None,
-        "unit": "%",
-        "category": "成長性",
-        "interpretation": "正值代表公司業務成長，> 10% 為高成長。"
-    },
-    "eps_growth": {
-        "name": "EPS成長率",
-        "full_name": "每股盈餘年增率",
-        "description": "今年EPS相較去年的成長幅度",
-        "formula": "(今年EPS - 去年EPS) / 去年EPS × 100%",
-        "ideal_min": 15,
-        "ideal_max": None,
-        "unit": "%",
-        "category": "成長性",
-        "interpretation": "正值代表獲利成長，> 15% 代表高成長潛力。"
-    },
     "dividend_years": {
         "name": "配息年數",
         "full_name": "連續配息年數",
@@ -154,28 +132,6 @@ INDICATORS = {
         "unit": "%",
         "category": "財務安全",
         "interpretation": "越低越好，高負債率代表財務風險較高。< 50% 為理想。"
-    },
-    "current_ratio": {
-        "name": "流動比率",
-        "full_name": "流動比率",
-        "description": "短期償債能力指標",
-        "formula": "流動資產 / 流動負債 × 100%",
-        "ideal_min": 150,
-        "ideal_max": None,
-        "unit": "%",
-        "category": "財務安全",
-        "interpretation": "越高越好，> 150% 代表短期償債能力佳。"
-    },
-    "quick_ratio": {
-        "name": "速動比率",
-        "full_name": "速動比率",
-        "description": "更嚴格的短期償債能力指標（排除存貨）",
-        "formula": "(流動資產 - 存貨) / 流動負債 × 100%",
-        "ideal_min": 100,
-        "ideal_max": None,
-        "unit": "%",
-        "category": "財務安全",
-        "interpretation": "越高越好，> 100% 代表即使不賣存貨也能償還短期債務。"
     }
 }
 
@@ -187,15 +143,21 @@ SCORING_WEIGHTS = {
     "debt_ratio": 0.15 # 15%
 }
 
+# ETF 專用評分權重
+ETF_SCORING_WEIGHTS = {
+    "dividend_yield": 0.70,  # 70% (ETF 重視配息)
+    "pb": 0.30               # 30% (折溢價參考)
+}
+
 # 策略定義
 STRATEGIES = {
     "growth": {
-        "name": "🚀 成長股",
-        "description": "追求高成長潛力的股票",
+        "name": "🚀 成長潛力",
+        "description": "高獲利效率且財務結構佳",
         "conditions": {
-            "roe": {"min": 15},
-            "eps_growth": {"min": 15},
-            "revenue_growth": {"min": 10}
+            "roe": {"min": 20},              # 高 ROE 代替成長率
+            "net_profit_margin": {"min": 20}, # 高淨利
+            "dept_ratio": {"max": 50}
         }
     },
     "value": {

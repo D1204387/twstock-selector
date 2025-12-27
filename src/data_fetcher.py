@@ -20,10 +20,10 @@ try:
 except ImportError:
     twstock = None
 
-from .database import (
-    get_connection, save_stocks, get_all_stocks,
-    save_financial_data, get_cache, set_cache
-)
+# from .database import (
+#     get_connection, save_stocks, get_all_stocks,
+#     save_financial_data, get_cache, set_cache
+# )
 
 
 # API URLs
@@ -129,23 +129,7 @@ def get_stock_list(force_refresh: bool = False, core_only: bool = True) -> pd.Da
     """
     from .finmind_api import get_core_stocks_list
     
-    # 檢查快取
-    if not force_refresh:
-        cached = get_cache('stock_list')
-        if cached:
-            df = pd.DataFrame(cached)
-            if core_only:
-                core_stocks = get_core_stocks_list()
-                df = df[df['stock_id'].isin(core_stocks)]
-            return df
-        
-        # 檢查資料庫
-        df = get_all_stocks()
-        if not df.empty:
-            if core_only:
-                core_stocks = get_core_stocks_list()
-                df = df[df['stock_id'].isin(core_stocks)]
-            return df
+    from .finmind_api import get_core_stocks_list
     
     print("📊 正在取得股票列表...")
     
@@ -163,11 +147,10 @@ def get_stock_list(force_refresh: bool = False, core_only: bool = True) -> pd.Da
     df['industry'] = df['stock_id'].map(industry_map).fillna('其他')
     
     if not df.empty:
-        # 儲存到資料庫
-        save_stocks(df)
+        # save_stocks(df)
         
         # 設定快取
-        set_cache('stock_list', df.to_dict('records'), ttl_seconds=86400)
+        # set_cache('stock_list', df.to_dict('records'), ttl_seconds=86400)
         
         print(f"✅ 已取得 {len(df)} 檔標的")
     
@@ -394,20 +377,43 @@ def generate_sample_data(use_real_data: bool = True, token: str = None) -> pd.Da
                 print("📂 使用今日快取的完整財務資料")
                 cached_df = pd.read_csv(cache_file, encoding='utf-8-sig')
                 
-                for _, row in cached_df.iterrows():
-                    stock_id = row.get('stock_id')
-                    if stock_id in df['stock_id'].values:
-                        idx = df[df['stock_id'] == stock_id].index[0]
-                        
-                        # 更新所有有效的指標
-                        for col in ['roe', 'roa', 'eps', 'net_profit_margin', 'gross_margin',
-                                   'operating_margin', 'debt_ratio', 'pe', 'pb', 
-                                   'dividend_yield', 'dividend_years', 'revenue_growth', 
-                                   'eps_growth', 'price']:
-                            if col in row and pd.notna(row[col]):
-                                df.loc[idx, col] = row[col]
-                        
-                        df.loc[idx, 'is_real_data'] = True
+                # 優化：使用向量化操作取代迴圈
+                # 先將 stock_id 設為兩者的 index 以便對齊
+                df.set_index('stock_id', inplace=True)
+                cached_df.set_index('stock_id', inplace=True)
+                
+                # 找出共有的欄位
+                common_cols = list(set(df.columns) & set(cached_df.columns))
+                common_cols = [c for c in common_cols if c != 'stock_id']
+                
+                # 使用真實資料更新 (僅更新共有的欄位)
+                # update 會保留 df 中那些 cached_df 為 NaN 的值，這不是我們要的
+                # 我們想要 cached_df 有值的就覆蓋
+                
+                # 更好的方式：直接賦值真實資料的欄位
+                # 但要小心 cached_df 可能包含 df 沒有的股票，或少了 df 有的股票
+                
+                # 過濾出需要的欄位
+                target_cols = ['roe', 'roa', 'eps', 'net_profit_margin', 'gross_margin',
+                               'operating_margin', 'debt_ratio', 'pe', 'pb', 
+                               'dividend_yield', 'dividend_years', 'revenue_growth', 
+                               'eps_growth', 'price']
+                
+                valid_cols = [c for c in target_cols if c in cached_df.columns]
+                
+                if valid_cols:
+                    # 僅更新 df 中存在的股票
+                    # 使用 update，它會用 cached_df 的非 NA 值更新 df
+                    df.update(cached_df[valid_cols])
+                    
+                    # 標記真實資料
+                    # 找出在 cached_df 中有資料的股票索引
+                    common_indices = df.index.intersection(cached_df.index)
+                    if not common_indices.empty:
+                        df.loc[common_indices, 'is_real_data'] = True
+                
+                # 還原 index
+                df.reset_index(inplace=True)
                 
                 print(f"✅ 已更新 {len(cached_df)} 檔股票的真實資料")
             else:
@@ -415,15 +421,21 @@ def generate_sample_data(use_real_data: bool = True, token: str = None) -> pd.Da
                 real_data = get_quick_financial_data(token)
                 
                 if not real_data.empty:
-                    for _, row in real_data.iterrows():
-                        stock_id = row.get('stock_id')
-                        if stock_id in df['stock_id'].values:
-                            idx = df[df['stock_id'] == stock_id].index[0]
-                            if row.get('pe') is not None:
-                                df.loc[idx, 'pe'] = row['pe']
-                            if row.get('pb') is not None:
-                                df.loc[idx, 'pb'] = row['pb']
-                            df.loc[idx, 'is_real_data'] = True
+                    df.set_index('stock_id', inplace=True)
+                    real_data.set_index('stock_id', inplace=True)
+                    
+                    # 更新 PE/PB
+                    if 'pe' in real_data.columns:
+                        df.update(real_data[['pe']])
+                    if 'pb' in real_data.columns:
+                        df.update(real_data[['pb']])
+                    
+                    # 標記真實資料
+                    common_indices = df.index.intersection(real_data.index)
+                    if not common_indices.empty:
+                        df.loc[common_indices, 'is_real_data'] = True
+                        
+                    df.reset_index(inplace=True)
                     
                     print(f"✅ 已更新 {len(real_data)} 檔股票的真實 PE/PB 資料")
             
@@ -442,4 +454,81 @@ def generate_sample_data(use_real_data: bool = True, token: str = None) -> pd.Da
         df[col] = df[col].round(2)
     
     return df
+
+
+def load_robust_data() -> pd.DataFrame:
+    """載入真實財務資料（無模擬數據）
+    
+    Returns:
+        包含真實財務指標的 DataFrame，若無資料則為 NaN
+    """
+    from .finmind_api import CACHE_DIR
+    import numpy as np
+    
+    # 1. 取得基礎股票列表
+    df = get_stock_list()
+    if df.empty:
+        return df
+        
+    # 2. 初始化欄位為 NaN
+    cols = ['roe', 'roa', 'eps', 'net_profit_margin', 'gross_margin',
+            'operating_margin', 'debt_ratio', 'pe', 'pb', 
+            'dividend_yield', 'dividend_years', 'revenue_growth', 
+            'eps_growth', 'price']
+            
+    for col in cols:
+        df[col] = np.nan
+        
+    df['is_real_data'] = False
+    
+    # 3. 讀取穩健下載的快取資料
+    cache_file = CACHE_DIR / "robust_indicators_data.csv"
+    
+    if cache_file.exists():
+        try:
+            cached_df = pd.read_csv(cache_file, dtype={'stock_id': str})
+            
+            # 使用 update 更新資料
+            df.set_index('stock_id', inplace=True)
+            cached_df.set_index('stock_id', inplace=True)
+            
+            valid_cols = [c for c in cols if c in cached_df.columns]
+            if valid_cols:
+                df.update(cached_df[valid_cols])
+                
+                # 標記有資料的列
+                common = df.index.intersection(cached_df.index)
+                df.loc[common, 'is_real_data'] = True
+                
+            df.reset_index(inplace=True)
+            print(f"✅ 已載入穩健真實資料: {len(common)} 筆")
+            
+        except Exception as e:
+            print(f"❌ 讀取真實資料快取失敗: {e}")
+    else:
+        print("⚠️ 找不到真實資料快取檔案 (robust_indicators_data.csv)")
+    
+    # 四捨五入
+    for col in df.select_dtypes(include=[np.number]).columns:
+        df[col] = df[col].round(2)
+        
+    return df
+
+
+def get_data_update_time() -> str:
+    """取得資料最後更新時間
+    
+    Returns:
+        格化後的時間字串，若無檔案則回傳 '尚未更新'
+    """
+    from .finmind_api import CACHE_DIR
+    cache_file = CACHE_DIR / "robust_indicators_data.csv"
+    
+    if cache_file.exists():
+        timestamp = cache_file.stat().st_mtime
+        dt = datetime.fromtimestamp(timestamp)
+        return dt.strftime("%Y-%m-%d %H:%M")
+    
+    return "尚未更新"
+
 

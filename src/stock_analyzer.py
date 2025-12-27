@@ -11,7 +11,7 @@ from pathlib import Path
 
 # 加入專案根目錄到 path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from config import SCORING_WEIGHTS, INDICATORS
+from config import SCORING_WEIGHTS, ETF_SCORING_WEIGHTS, INDICATORS
 
 
 def calculate_score(df: pd.DataFrame, weights: Dict = None) -> pd.DataFrame:
@@ -40,34 +40,43 @@ def calculate_score(df: pd.DataFrame, weights: Dict = None) -> pd.DataFrame:
     result['pe_score'] = 0.0
     result['pb_score'] = 0.0
     result['debt_score'] = 0.0
+    result['dividend_score'] = 0.0
     
-    # ROE 評分 (越高越好)
-    # 0-5%: 0-2分, 5-10%: 2-4分, 10-15%: 4-6分, 15-20%: 6-8分, 20%+: 8-10分
+    # 預計算各項分數 function (vectorized apply)
     if 'roe' in result.columns:
-        result['roe_score'] = result['roe'].apply(lambda x: score_roe(x) if pd.notna(x) else 0)
-    
-    # PE 評分 (適中最好)
-    # PE < 10: 可能風險, PE 10-15: 良好, PE 15-20: 合理, PE > 20: 偏高
+        result['roe_score'] = result['roe'].apply(lambda x: score_roe(x))
     if 'pe' in result.columns:
-        result['pe_score'] = result['pe'].apply(lambda x: score_pe(x) if pd.notna(x) else 0)
-    
-    # PB 評分 (越低越好)
-    # PB < 1: 滿分, PB 1-2: 良好, PB 2-3: 普通, PB > 3: 較差
+        result['pe_score'] = result['pe'].apply(lambda x: score_pe(x))
     if 'pb' in result.columns:
-        result['pb_score'] = result['pb'].apply(lambda x: score_pb(x) if pd.notna(x) else 0)
-    
-    # 負債率評分 (越低越好)
-    # < 30%: 滿分, 30-50%: 良好, 50-70%: 普通, > 70%: 較差
+        result['pb_score'] = result['pb'].apply(lambda x: score_pb(x))
     if 'debt_ratio' in result.columns:
-        result['debt_score'] = result['debt_ratio'].apply(lambda x: score_debt_ratio(x) if pd.notna(x) else 0)
-    
-    # 計算加權總分
-    result['score'] = (
-        result['roe_score'] * weights.get('roe', 0.4) +
-        result['pe_score'] * weights.get('pe', 0.3) +
-        result['pb_score'] * weights.get('pb', 0.15) +
-        result['debt_score'] * weights.get('debt_ratio', 0.15)
-    )
+        result['debt_score'] = result['debt_ratio'].apply(lambda x: score_debt_ratio(x))
+    if 'dividend_yield' in result.columns:
+        result['dividend_score'] = result['dividend_yield'].apply(lambda x: score_dividend_yield(x))
+        
+    def calculate_single_score(row):
+        stock_id = str(row.get('stock_id', ''))
+        is_etf = stock_id.startswith('00')
+        
+        if is_etf:
+            # ETF 評分邏輯 (專注於 殖利率 + PB)
+            etf_weights = ETF_SCORING_WEIGHTS
+            score = (
+                row['dividend_score'] * etf_weights.get('dividend_yield', 0.7) +
+                row['pb_score'] * etf_weights.get('pb', 0.3)
+            )
+        else:
+            # 一般股票評分邏輯
+            w = weights
+            score = (
+                row['roe_score'] * w.get('roe', 0.4) +
+                row['pe_score'] * w.get('pe', 0.3) +
+                row['pb_score'] * w.get('pb', 0.15) +
+                row['debt_score'] * w.get('debt_ratio', 0.15)
+            )
+        return score
+
+    result['score'] = result.apply(calculate_single_score, axis=1)
     
     # 四捨五入
     result['score'] = result['score'].round(2)
@@ -157,6 +166,27 @@ def score_debt_ratio(debt_ratio: float) -> float:
         return max(0, 3 - (debt_ratio - 70) / 30 * 3)
 
 
+def score_dividend_yield(dy: float) -> float:
+    """殖利率評分函數"""
+    if dy is None or pd.isna(dy):
+        return 0
+    
+    if dy < 0:
+        return 0
+    elif dy < 2:
+        return 1
+    elif dy < 3:
+        return 3
+    elif dy < 4:
+        return 5
+    elif dy < 5:
+        return 7
+    elif dy < 7:
+        return 9
+    else:
+        return 10
+
+
 def get_top_stocks(df: pd.DataFrame, n: int = 20, weights: Dict = None) -> pd.DataFrame:
     """取得評分最高的前 N 檔股票
     
@@ -192,32 +222,59 @@ def get_score_breakdown(stock_data: pd.Series, weights: Dict = None) -> Dict:
     if weights is None:
         weights = SCORING_WEIGHTS
     
-    breakdown = {
-        'roe': {
-            'value': stock_data.get('roe'),
-            'score': score_roe(stock_data.get('roe', 0)),
-            'weight': weights.get('roe', 0.4),
-            'weighted_score': score_roe(stock_data.get('roe', 0)) * weights.get('roe', 0.4)
-        },
-        'pe': {
-            'value': stock_data.get('pe'),
-            'score': score_pe(stock_data.get('pe', 0)),
-            'weight': weights.get('pe', 0.3),
-            'weighted_score': score_pe(stock_data.get('pe', 0)) * weights.get('pe', 0.3)
-        },
-        'pb': {
-            'value': stock_data.get('pb'),
-            'score': score_pb(stock_data.get('pb', 0)),
-            'weight': weights.get('pb', 0.15),
-            'weighted_score': score_pb(stock_data.get('pb', 0)) * weights.get('pb', 0.15)
-        },
-        'debt_ratio': {
-            'value': stock_data.get('debt_ratio'),
-            'score': score_debt_ratio(stock_data.get('debt_ratio', 0)),
-            'weight': weights.get('debt_ratio', 0.15),
-            'weighted_score': score_debt_ratio(stock_data.get('debt_ratio', 0)) * weights.get('debt_ratio', 0.15)
+    stock_id = str(stock_data.get('stock_id', ''))
+    is_etf = stock_id.startswith('00')
+    
+    if is_etf:
+        # ETF 評分明細
+        etf_weights = ETF_SCORING_WEIGHTS
+        
+        # 計算各項分數
+        div_score = score_dividend_yield(stock_data.get('dividend_yield', 0))
+        pb_score = score_pb(stock_data.get('pb', 0))
+        
+        breakdown = {
+            'dividend_yield': {
+                'value': stock_data.get('dividend_yield'),
+                'score': div_score,
+                'weight': etf_weights.get('dividend_yield', 0.7),
+                'weighted_score': div_score * etf_weights.get('dividend_yield', 0.7)
+            },
+            'pb': {
+                'value': stock_data.get('pb'),
+                'score': pb_score,
+                'weight': etf_weights.get('pb', 0.3),
+                'weighted_score': pb_score * etf_weights.get('pb', 0.3)
+            }
         }
-    }
+    else:
+        # 一般個股評分明細
+        breakdown = {
+            'roe': {
+                'value': stock_data.get('roe'),
+                'score': score_roe(stock_data.get('roe', 0)),
+                'weight': weights.get('roe', 0.4),
+                'weighted_score': score_roe(stock_data.get('roe', 0)) * weights.get('roe', 0.4)
+            },
+            'pe': {
+                'value': stock_data.get('pe'),
+                'score': score_pe(stock_data.get('pe', 0)),
+                'weight': weights.get('pe', 0.3),
+                'weighted_score': score_pe(stock_data.get('pe', 0)) * weights.get('pe', 0.3)
+            },
+            'pb': {
+                'value': stock_data.get('pb'),
+                'score': score_pb(stock_data.get('pb', 0)),
+                'weight': weights.get('pb', 0.15),
+                'weighted_score': score_pb(stock_data.get('pb', 0)) * weights.get('pb', 0.15)
+            },
+            'debt_ratio': {
+                'value': stock_data.get('debt_ratio'),
+                'score': score_debt_ratio(stock_data.get('debt_ratio', 0)),
+                'weight': weights.get('debt_ratio', 0.15),
+                'weighted_score': score_debt_ratio(stock_data.get('debt_ratio', 0)) * weights.get('debt_ratio', 0.15)
+            }
+        }
     
     breakdown['total_score'] = sum(item['weighted_score'] for item in breakdown.values())
     
@@ -268,19 +325,31 @@ def analyze_stock(stock_data: Dict) -> Dict:
     Returns:
         分析結果字典
     """
+    # 判斷是否為 ETF
+    stock_id = str(stock_data.get('stock_id', ''))
+    is_etf = stock_id.startswith('00')
+    
     # 計算各項評分
     roe_score = score_roe(stock_data.get('roe', 0))
     pe_score = score_pe(stock_data.get('pe', 0))
     pb_score = score_pb(stock_data.get('pb', 0))
     debt_score = score_debt_ratio(stock_data.get('debt_ratio', 0))
+    dividend_score = score_dividend_yield(stock_data.get('dividend_yield', 0))
     
-    weights = SCORING_WEIGHTS
-    total_score = (
-        roe_score * weights['roe'] +
-        pe_score * weights['pe'] +
-        pb_score * weights['pb'] +
-        debt_score * weights['debt_ratio']
-    )
+    if is_etf:
+        etf_weights = ETF_SCORING_WEIGHTS
+        total_score = (
+            dividend_score * etf_weights.get('dividend_yield', 0.7) +
+            pb_score * etf_weights.get('pb', 0.3)
+        )
+    else:
+        weights = SCORING_WEIGHTS
+        total_score = (
+            roe_score * weights['roe'] +
+            pe_score * weights['pe'] +
+            pb_score * weights['pb'] +
+            debt_score * weights['debt_ratio']
+        )
     
     grade = get_score_grade(total_score)
     
@@ -288,31 +357,44 @@ def analyze_stock(stock_data: Dict) -> Dict:
     strengths = []
     weaknesses = []
     
-    # ROE 分析
-    roe = stock_data.get('roe', 0)
-    if roe and roe >= 15:
-        strengths.append(f"高股東權益報酬率 ({roe:.1f}%)")
-    elif roe and roe < 10:
-        weaknesses.append(f"股東權益報酬率偏低 ({roe:.1f}%)")
-    
-    # PE 分析
-    pe = stock_data.get('pe', 0)
-    if pe and 10 <= pe <= 15:
-        strengths.append(f"本益比合理 ({pe:.1f})")
-    elif pe and pe > 30:
-        weaknesses.append(f"本益比偏高 ({pe:.1f})")
-    
-    # 負債率分析
-    debt = stock_data.get('debt_ratio', 0)
-    if debt and debt < 40:
-        strengths.append(f"財務結構穩健 (負債率 {debt:.1f}%)")
-    elif debt and debt > 60:
-        weaknesses.append(f"負債比例偏高 ({debt:.1f}%)")
-    
-    # 股息分析
+    # 股息分析 (ETF 優先檢查)
     div_yield = stock_data.get('dividend_yield', 0)
     if div_yield and div_yield >= 5:
         strengths.append(f"高殖利率 ({div_yield:.1f}%)")
+    elif div_yield and div_yield < 3 and is_etf:
+        weaknesses.append(f"殖利率偏低 ({div_yield:.1f}%)")
+
+    # PB 分析
+    pb = stock_data.get('pb', 0)
+    if pb and pb < 1:
+        strengths.append(f"股價低於淨值 (PB {pb:.2f})")
+    elif pb and pb > 2 and is_etf:
+         # ETF PB > 2 算高溢價風險
+        weaknesses.append(f"股價淨值比偏高 ({pb:.2f})")
+
+    if not is_etf:
+        # 一般個股才看 ROE / 負債比 / PE
+        
+        # ROE 分析
+        roe = stock_data.get('roe', 0)
+        if roe and roe >= 15:
+            strengths.append(f"高股東權益報酬率 ({roe:.1f}%)")
+        elif roe and roe < 10:
+            weaknesses.append(f"股東權益報酬率偏低 ({roe:.1f}%)")
+        
+        # PE 分析
+        pe = stock_data.get('pe', 0)
+        if pe and 10 <= pe <= 15:
+            strengths.append(f"本益比合理 ({pe:.1f})")
+        elif pe and pe > 30:
+            weaknesses.append(f"本益比偏高 ({pe:.1f})")
+        
+        # 負債率分析
+        debt = stock_data.get('debt_ratio', 0)
+        if debt and debt < 40:
+            strengths.append(f"財務結構穩健 (負債率 {debt:.1f}%)")
+        elif debt and debt > 60:
+            weaknesses.append(f"負債比例偏高 ({debt:.1f}%)")
     
     return {
         'score': round(total_score, 2),
@@ -324,6 +406,7 @@ def analyze_stock(stock_data: Dict) -> Dict:
             'roe_score': round(roe_score, 2),
             'pe_score': round(pe_score, 2),
             'pb_score': round(pb_score, 2),
-            'debt_score': round(debt_score, 2)
+            'debt_score': round(debt_score, 2),
+            'dividend_score': round(dividend_score, 2)
         }
     }

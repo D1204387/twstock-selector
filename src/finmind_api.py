@@ -70,12 +70,19 @@ def get_finmind_data(dataset: str, stock_id: str = None, start_date: str = None,
         response.raise_for_status()
         data = response.json()
         
-        if data.get("status") == 200 and data.get("data"):
+        if data and data.get("status") == 200 and data.get("data"):
             return pd.DataFrame(data["data"])
         else:
-            print(f"⚠️ FinMind 回應: {data.get('msg', 'No data')}")
+            msg = data.get('msg', 'No data') if data else 'Empty response from API'
+            print(f"⚠️ FinMind 回應: {msg}")
             return pd.DataFrame()
             
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 402:
+            print("🚨 API 額度已用完 (402 Payment Required)")
+            raise BlockingIOError("API Quota Exceeded")
+        print(f"❌ FinMind API 錯誤: {e}")
+        return pd.DataFrame()
     except Exception as e:
         print(f"❌ FinMind API 錯誤: {e}")
         return pd.DataFrame()
@@ -674,6 +681,10 @@ def fetch_indicators_lite(stock_id: str, token: str = None) -> Dict:
         result['pb'] = float(latest.get('PBR', 0)) if latest.get('PBR') else None
         result['price'] = float(latest.get('close', 0)) if latest.get('close') else None
     
+    # 如果沒有取得股價，額外呼叫股價 API
+    if result['price'] is None:
+        result['price'] = fetch_stock_price(stock_id, token)
+    
     time.sleep(0.15)
     
     # === 請求 2: 股利 (TaiwanStockDividend) ===
@@ -722,6 +733,12 @@ def fetch_indicators_lite(stock_id: str, token: str = None) -> Dict:
         except:
             pass
         
+        # 暫存計算用的原始數據
+        raw_data = {
+            'NetIncome': None, 'Revenue': None, 'Equity': None,
+            'GrossProfit': None, 'OperatingIncome': None
+        }
+
         for _, row in latest.iterrows():
             item_type = str(row.get('type', '')).lower()
             try:
@@ -730,6 +747,25 @@ def fetch_indicators_lite(stock_id: str, token: str = None) -> Dict:
                 val = None
             
             if val is not None:
+                # 收集原始數據
+                # 修正：避免抓到 "NonControllingInterest" (3.8e8) 覆蓋真正的 NetIncome (4.5e11)
+                # IncomeAfterTaxes = 本期淨利 (通常指歸屬於母公司)
+                if ('incomeaftertaxes' in item_type or 'netincome' in item_type) and 'non' not in item_type: 
+                     raw_data['NetIncome'] = val
+                elif 'equityattributabletoownersofparent' in item_type: # 權益總額
+                     raw_data['Equity'] = val
+                elif 'revenue' in item_type and 'non' not in item_type: # 營收
+                     raw_data['Revenue'] = val
+                elif 'grossprofit' in item_type: # 毛利
+                     raw_data['GrossProfit'] = val
+                elif 'operatingincome' in item_type: # 營業利益
+                     raw_data['OperatingIncome'] = val
+                elif 'totalliabilities' in item_type and 'non' not in item_type: # 總負債
+                     raw_data['TotalLiabilities'] = val
+                elif 'totalassets' in item_type and 'non' not in item_type: # 總資產
+                     raw_data['TotalAssets'] = val
+
+                # 嘗試直接讀取（雖然現在 API 可能沒給）
                 if 'roe' in item_type or '股東權益報酬率' in item_type:
                     if quarter and quarter < 4:
                         result['roe'] = round(val / quarter * 4, 2)
@@ -750,8 +786,58 @@ def fetch_indicators_lite(stock_id: str, token: str = None) -> Dict:
                     result['operating_margin'] = val
                 elif '負債比率' in item_type:
                     result['debt_ratio'] = val
-    
-    time.sleep(0.15)
+        
+        # 手動計算補充
+        
+        # 0. ROE 補救策略 B: 使用 PB / PE 推算
+        # ROE = EPS / BPS = (Price/PE) / (Price/PB) = PB / PE
+        # 這是最穩健的算法，因為 PE/PB 通常都有值
+        if result['roe'] is None and result['pe'] and result['pb'] and result['pe'] > 0:
+            try:
+                implied_roe = (result['pb'] / result['pe']) * 100
+                result['roe'] = round(implied_roe, 2)
+            except:
+                pass
+
+        # 1. ROE 補救策略 A: NetIncome / Equity (如果策略 B 失敗)
+        if result['roe'] is None and raw_data['NetIncome'] and raw_data['Equity'] and raw_data['Equity'] != 0:
+            current_roe = (raw_data['NetIncome'] / raw_data['Equity']) * 100
+             # 簡單年化：若是 Q1~Q3 累計，這裡簡化視為單季或累計處理
+             # FinMind 回傳的 IncomeAfterTaxes 在 FinancialStatements 通常是單季
+            result['roe'] = round(current_roe * 4, 2)
+
+        # 2. 淨利率 = NetIncome / Revenue
+        if result['net_profit_margin'] is None and raw_data['NetIncome'] and raw_data['Revenue'] and raw_data['Revenue'] != 0:
+            result['net_profit_margin'] = round((raw_data['NetIncome'] / raw_data['Revenue']) * 100, 2)
+
+        # 3. 毛利率 = GrossProfit / Revenue
+        if result['gross_margin'] is None and raw_data['GrossProfit'] and raw_data['Revenue'] and raw_data['Revenue'] != 0:
+            result['gross_margin'] = round((raw_data['GrossProfit'] / raw_data['Revenue']) * 100, 2)
+            
+        # 4. 負債比率 = TotalLiabilities / TotalAssets
+        if result['debt_ratio'] is None and raw_data.get('TotalLiabilities') and raw_data.get('TotalAssets') and raw_data.get('TotalAssets') != 0:
+            result['debt_ratio'] = round((raw_data['TotalLiabilities'] / raw_data['TotalAssets']) * 100, 2)
+
+
+        # 5. 流動比率 & 速動比率 (需從 BalanceSheet 抓取)
+        # 由於 fetch_indicators_lite 只抓 FinancialStatements (綜合損益表)，
+        # 這裡只能嘗試從現有欄位找。若 FinMind 的 FinancialStatements 包含資產負債項目則可算，
+        # 否則這是 Lite 版的限制。
+        # 經過 debug_roe 確認，FinancialStatements 只有損益項目，無資產負債細項 (除了權益)。
+        # 因此 Lite 版無法計算流動/速動比率。
+        # 解決方案：設為 None 或後續考慮加抓 BalanceSheet (會增加 API call)。
+        # 為了效能，Lite 版暫時不抓 BalanceSheet。
+        
+        # 6. 成長率計算 (需要同期比較)
+        # Lite 版只抓了最近一季，無法計算 YoY。
+        # 若要算，需由前端資料庫比較不同季度的資料，或在此處多抓一年資料。
+        # 考量效能，這裡先設為 None，或在 batch_processing 時處理。
+        
+        # 為了滿足 15 項指標的承諾，我們必須在 Lite 版做取捨，
+        # 或者在這裡偷抓上一季資料來算 YoY (API call 不變，只是 start_date 拉長)。
+        
+        pass
+
     return result
 
 

@@ -277,18 +277,6 @@ def calculate_all_indicators(financial_data: Dict) -> Dict:
         )
     
     # 成長性
-    if 'revenue' in financial_data and 'prev_revenue' in financial_data:
-        result['revenue_growth'] = calculate_growth_rate(
-            financial_data['revenue'],
-            financial_data['prev_revenue']
-        )
-    
-    if 'eps' in financial_data and 'prev_eps' in financial_data:
-        result['eps_growth'] = calculate_growth_rate(
-            financial_data['eps'],
-            financial_data['prev_eps']
-        )
-    
     if 'dividend_years' in financial_data:
         result['dividend_years'] = financial_data['dividend_years']
     
@@ -297,19 +285,6 @@ def calculate_all_indicators(financial_data: Dict) -> Dict:
         result['debt_ratio'] = calculate_debt_ratio(
             financial_data['total_debt'],
             financial_data['total_assets']
-        )
-    
-    if 'current_assets' in financial_data and 'current_liabilities' in financial_data:
-        result['current_ratio'] = calculate_current_ratio(
-            financial_data['current_assets'],
-            financial_data['current_liabilities']
-        )
-    
-    if all(k in financial_data for k in ['current_assets', 'inventory', 'current_liabilities']):
-        result['quick_ratio'] = calculate_quick_ratio(
-            financial_data['current_assets'],
-            financial_data['inventory'],
-            financial_data['current_liabilities']
         )
     
     return result

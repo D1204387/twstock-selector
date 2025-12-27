@@ -12,7 +12,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.data_fetcher import get_stock_list, generate_sample_data
+from src.data_fetcher import get_stock_list, generate_sample_data, load_robust_data
 from src.stock_analyzer import analyze_stock, get_score_grade
 from src.indicators import get_indicators_by_category
 from src.styles import GLARITY_STYLE
@@ -92,9 +92,7 @@ with st.sidebar:
 
 @st.cache_data(ttl=3600)
 def load_data():
-    df = get_stock_list()
-    if df.empty or 'roe' not in df.columns:
-        df = generate_sample_data()
+    df = load_robust_data()
     return df
 
 df = load_data()

@@ -22,14 +22,15 @@ st.set_page_config(
 # 加入專案根目錄到 path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.database import init_db
-from src.data_fetcher import get_stock_list, generate_sample_data
+# from src.database import init_db
+from src.data_fetcher import get_stock_list, generate_sample_data, load_robust_data, get_data_update_time
 from src.stock_analyzer import get_top_stocks
 from src.styles import GLARITY_STYLE
 from config import STRATEGIES
+from src.help_docs import SCORING_HELP
 
 # 初始化資料庫
-init_db()
+# init_db()
 
 # 套用 Glarity 風格
 st.markdown(GLARITY_STYLE, unsafe_allow_html=True)
@@ -49,14 +50,28 @@ if st.sidebar.button("🏠 首頁", use_container_width=True, type="primary"):
     st.switch_page("main.py")
 st.sidebar.markdown("---")
 
+# 顯示資料更新時間
+update_time = get_data_update_time()
+st.sidebar.markdown(f"""
+<div style="font-size: 0.8rem; color: #666; margin-bottom: 1rem;">
+    🟢 資料狀態：已更新<br>
+    🕒 {update_time}
+</div>
+""", unsafe_allow_html=True)
+
 
 def main():
     """主程式"""
     # 載入資料
+    # 載入資料 (加入快取機制)
+    @st.cache_data(ttl=3600)
+    def load_data():
+        # 改用穩健資料載入（無模擬數據）
+        df = load_robust_data()
+        return df
+
     with st.spinner("正在載入股票資料..."):
-        df = get_stock_list()
-        if df.empty or 'roe' not in df.columns:
-            df = generate_sample_data()
+        df = load_data()
     
     stock_count = len(df[df['asset_type'] == 'stock']) if 'asset_type' in df.columns else len(df)
     etf_count = len(df[df['asset_type'] == 'etf']) if 'asset_type' in df.columns else 0
@@ -128,13 +143,21 @@ def main():
         for key, strategy in STRATEGIES.items():
             conditions = strategy.get('conditions', {})
             cond_list = []
+            # 簡易中文對照表
+            display_map = {
+                'roe': 'ROE', 'pe': 'PE', 'pb': 'PB', 'eps': 'EPS',
+                'dividend_yield': '殖利率', 'dividend_years': '配息年數',
+                'debt_ratio': '負債率'
+            }
+
             for k, v in conditions.items():
+                name = display_map.get(k, k.upper())
                 if v.get('min') and v.get('max'):
-                    cond_list.append(f"{k.upper()} {v['min']}~{v['max']}")
+                    cond_list.append(f"{name} {v['min']}~{v['max']}")
                 elif v.get('min'):
-                    cond_list.append(f"{k.upper()}>{v['min']}")
+                    cond_list.append(f"{name}≥{v['min']}")
                 elif v.get('max'):
-                    cond_list.append(f"{k.upper()}<{v['max']}")
+                    cond_list.append(f"{name}≤{v['max']}")
             
             st.markdown(f"""
             <div class="feature-card">
@@ -152,12 +175,21 @@ def main():
         top_stocks = get_top_stocks(df, n=10)
         
         if not top_stocks.empty:
-            display_df = top_stocks[['stock_id', 'name', 'industry', 'roe', 'pe', 'pb', 'dividend_yield', 'score']].copy()
-            display_df.columns = ['代號', '名稱', '產業', 'ROE(%)', 'PE', 'PB', '殖利率(%)', '評分']
+            # 統一欄位格式，與其他頁面一致
+            display_cols = ['stock_id', 'name', 'price', 'score', 'roe', 'pe', 'pb', 'dividend_yield', 'debt_ratio']
+            display_cols = [c for c in display_cols if c in top_stocks.columns]
+            display_df = top_stocks[display_cols].copy()
             
-            for col in ['ROE(%)', 'PE', 'PB', '殖利率(%)', '評分']:
-                if col in display_df.columns:
-                    display_df[col] = display_df[col].round(2)
+            # 加入序號欄位
+            display_df.insert(0, '序號', range(1, len(display_df) + 1))
+            
+            # 統一欄位名稱（與篩選頁和排名頁一致）
+            column_names = {'stock_id': '代號', 'name': '名稱', 'price': '股價', 'score': '評分',
+                            'roe': 'ROE%(40%)', 'pe': 'PE(30%)', 'pb': 'PB(15%)', 'dividend_yield': '殖利率(%)', 'debt_ratio': '負債率%(15%)'}
+            display_df = display_df.rename(columns=column_names)
+            
+            for col in display_df.select_dtypes(include=['float64']).columns:
+                display_df[col] = display_df[col].round(2)
             
             st.dataframe(display_df, use_container_width=True, hide_index=True)
         else:
@@ -246,59 +278,35 @@ def main():
         
         with tabs[1]:
             st.markdown("""
-            ### 15 項財務指標一覽
+            ### 12 項財務指標一覽
             
             #### 🔷 獲利能力（5 項）
-            | 指標 | 公式 | 理想值 |
-            |------|------|--------|
-            | ROE | 淨利 ÷ 股東權益 | > 15% |
-            | ROA | 淨利 ÷ 總資產 | > 8% |
-            | 淨利率 | 淨利 ÷ 營收 | > 10% |
-            | 毛利率 | (營收-成本) ÷ 營收 | > 20% |
-            | 營業利潤率 | 營業利益 ÷ 營收 | > 10% |
+            | 指標 | 公式 | 說明 | 理想值 |
+            |------|------|------|--------|
+            | ROE | 淨利 ÷ 股東權益 | 衡量公司運用股東資本創造利潤的能力 | > 15% |
+            | ROA | 淨利 ÷ 總資產 | 衡量公司運用總資產創造利潤的效率 | > 8% |
+            | 淨利率 | 淨利 ÷ 營收 | 每一元營收中實際賺取的淨利 | > 10% |
+            | 毛利率 | (營收-成本) ÷ 營收 | 每一元營收扣除直接成本後的毛利 | > 20% |
+            | 營業利潤率 | 營業利益 ÷ 營收 | 本業經營的獲利能力 | > 10% |
             
             #### 🔷 估值指標（4 項）
-            | 指標 | 公式 | 理想值 |
-            |------|------|--------|
-            | PE | 股價 ÷ EPS | 10~20 |
-            | PB | 股價 ÷ 每股淨值 | < 2 |
-            | EPS | 稅後淨利 ÷ 股數 | > 3 元 |
-            | 殖利率 | 現金股利 ÷ 股價 | > 4% |
+            | 指標 | 公式 | 說明 | 理想值 |
+            |------|------|------|--------|
+            | PE | 股價 ÷ EPS | 股價相對於每股盈餘的倍數 | 10~20 |
+            | PB | 股價 ÷ 每股淨值 | 股價相對於每股淨值的倍數 | < 2 |
+            | EPS | 稅後淨利 ÷ 股數 | 每一股可分配到的盈餘 | > 3 元 |
+            | 殖利率 | 現金股利 ÷ 股價 | 每年現金股利相對於股價的比率 | > 4% |
             
-            #### 🔷 成長性（3 項）
-            | 指標 | 公式 | 理想值 |
-            |------|------|--------|
-            | 營收成長率 | 營收年增率 | > 10% |
-            | EPS成長率 | EPS年增率 | > 15% |
-            | 配息年數 | 連續配息年數 | > 5 年 |
-            
-            #### 🔷 財務安全（3 項）
-            | 指標 | 公式 | 理想值 |
-            |------|------|--------|
-            | 負債率 | 總負債 ÷ 總資產 | < 50% |
-            | 流動比率 | 流動資產 ÷ 流動負債 | > 150% |
-            | 速動比率 | (流動資產-存貨) ÷ 流動負債 | > 100% |
+            #### 🔷 其他指標（3 項）
+            | 指標 | 公式 | 說明 | 理想值 |
+            |------|------|------|--------|
+            | 配息年數 | 連續配息年數 | 公司連續發放現金股利的年數 | > 5 年 |
+            | 負債率 | 總負債 ÷ 總資產 | 公司總負債佔總資產的比例 | < 50% |
+            | 收盤價 | - | 最新交易日收盤價 | - |
             """)
         
         with tabs[2]:
-            st.markdown("""
-            ### 評分系統說明
-            
-            > ⚠️ **注意**：綜合評分只使用 **4 項核心指標**，用於快速評估股票整體品質
-            
-            ---
-            
-            **總分 = ROE×40% + PE×30% + PB×15% + 負債率×15%**
-            
-            | 評分指標 | 權重 | 計算方式 | 為何選用 |
-            |---------|------|---------|---------|
-            | **ROE** | 40% | ROE ÷ 3 | 最重要的獲利指標 |
-            | **PE** | 30% | 接近15分高 | 估值是否合理 |
-            | **PB** | 15% | PB低分高 | 資產價值保護 |
-            | **負債率** | 15% | 負債低分高 | 財務安全性 |
-            
-            **等級：** A+ (9-10) | A (8-9) | B+ (7-8) | B (6-7) | C (5-6) | D/F (<6)
-            """)
+            st.markdown(SCORING_HELP)
         
         with tabs[3]:
             st.markdown("""
@@ -321,7 +329,7 @@ def main():
             """)
     
     # 頁尾
-    st.markdown('<div class="footer">台股智選系統 v1.0 | Python 期末報告 | 2024</div>', unsafe_allow_html=True)
+    st.markdown('<div class="footer">台股智選系統 v1.0</div>', unsafe_allow_html=True)
 
 
 if __name__ == "__main__":

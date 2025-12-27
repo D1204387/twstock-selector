@@ -202,12 +202,8 @@ def get_indicator_display_name(indicator_key: str) -> str:
         'pb': '股價淨值比',
         'eps': 'EPS',
         'dividend_yield': '股息率',
-        'revenue_growth': '營收成長率',
-        'eps_growth': 'EPS成長率',
         'dividend_years': '配息年數',
-        'debt_ratio': '負債率',
-        'current_ratio': '流動比率',
-        'quick_ratio': '速動比率'
+        'debt_ratio': '負債率'
     }
     return names.get(indicator_key, indicator_key)
 

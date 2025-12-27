@@ -12,7 +12,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.data_fetcher import get_stock_list, generate_sample_data
+from src.data_fetcher import get_stock_list, generate_sample_data, load_robust_data
 from src.stock_screener import custom_screen, apply_strategy, format_strategy_conditions, get_strategy_matches_count
 from src.stock_analyzer import calculate_score
 from src.styles import GLARITY_STYLE
@@ -100,9 +100,7 @@ with st.sidebar:
 
 @st.cache_data(ttl=3600)
 def load_data():
-    df = get_stock_list()
-    if df.empty or 'roe' not in df.columns:
-        df = generate_sample_data()
+    df = load_robust_data()
     return df
 
 df = load_data()
@@ -125,13 +123,21 @@ for i, (key, strategy) in enumerate(STRATEGIES.items()):
         # 生成條件標準文字
         conditions = strategy.get('conditions', {})
         criteria_list = []
+        # 簡易中文對照表
+        display_map = {
+            'roe': 'ROE', 'pe': 'PE', 'pb': 'PB', 'eps': 'EPS',
+            'dividend_yield': '殖利率', 'dividend_years': '配息年數',
+            'debt_ratio': '負債率'
+        }
+
         for cond_key, cond_val in conditions.items():
+            name = display_map.get(cond_key, cond_key.upper())
             if 'min' in cond_val and 'max' in cond_val:
-                criteria_list.append(f"{cond_key.upper()}: {cond_val['min']}-{cond_val['max']}")
+                criteria_list.append(f"{name}: {cond_val['min']}-{cond_val['max']}")
             elif 'min' in cond_val:
-                criteria_list.append(f"{cond_key.upper()} ≥ {cond_val['min']}")
+                criteria_list.append(f"{name} ≥ {cond_val['min']}")
             elif 'max' in cond_val:
-                criteria_list.append(f"{cond_key.upper()} ≤ {cond_val['max']}")
+                criteria_list.append(f"{name} ≤ {cond_val['max']}")
         criteria_text = " | ".join(criteria_list) if criteria_list else ""
         
         # 判斷是否為選中狀態
@@ -309,6 +315,11 @@ else:
 
 # 指標說明
 with st.expander("📚 指標說明"):
-    for key, info in INDICATORS.items():
-        ideal = f"> {info['ideal_min']}" if info.get('ideal_min') else f"< {info['ideal_max']}" if info.get('ideal_max') else "N/A"
-        st.markdown(f"**{info['name']}** - {info['description']} (理想值: {ideal}{info.get('unit', '')})")
+    # 僅顯示篩選頁主要使用的指標
+    target_indicators = ['roe', 'pe', 'dividend_yield', 'debt_ratio']
+    
+    for key in target_indicators:
+        if key in INDICATORS:
+            info = INDICATORS[key]
+            ideal = f"> {info['ideal_min']}" if info.get('ideal_min') else f"< {info['ideal_max']}" if info.get('ideal_max') else "N/A"
+            st.markdown(f"**{info['name']}** - {info['description']} (理想值: {ideal}{info.get('unit', '')})")

@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.data_fetcher import get_stock_list, generate_sample_data
+from src.data_fetcher import get_stock_list, generate_sample_data, load_robust_data
 from src.stock_screener import custom_screen
 from src.stock_analyzer import calculate_score
 from src.ai_query import parse_natural_query, EXAMPLE_QUERIES
@@ -115,9 +115,7 @@ with st.sidebar:
 # 載入資料
 @st.cache_data(ttl=3600)
 def load_data():
-    df = get_stock_list()
-    if df.empty or 'roe' not in df.columns:
-        df = generate_sample_data()
+    df = load_robust_data()
     return df
 
 df = load_data()
@@ -172,17 +170,34 @@ if query:
             </div>
             """, unsafe_allow_html=True)
         
+        # 簡易中文對照表
+        display_map = {
+            'roe': 'ROE', 'pe': 'PE', 'pb': 'PB', 'eps': 'EPS',
+            'dividend_yield': '殖利率', 'dividend_years': '配息年數',
+            'debt_ratio': '負債率'
+        }
+        
         # 顯示篩選條件標籤
         filters = result.get("filters", {})
         if filters:
+            # 映射表：自然語言關鍵字 -> DataFrame 欄位
+            query_mapping = {
+                'roe': 'roe', '股東權益報酬率': 'roe',
+                'pe': 'pe', '本益比': 'pe',
+                'pb': 'pb', '股價淨值比': 'pb',
+                'dividend_yield': 'dividend_yield', '殖利率': 'dividend_yield',
+                'debt_ratio': 'debt_ratio', '負債率': 'debt_ratio'
+            }
+            
             filter_html = ""
             for key, value in filters.items():
+                name = display_map.get(key, key.upper())
                 if value.get('min') and value.get('max'):
-                    filter_html += f'<span class="filter-tag">{key}: {value["min"]} ~ {value["max"]}</span>'
+                    filter_html += f'<span class="filter-tag">{name}: {value["min"]}~{value["max"]}</span>'
                 elif value.get('min'):
-                    filter_html += f'<span class="filter-tag">{key} > {value["min"]}</span>'
+                    filter_html += f'<span class="filter-tag">{name}≥{value["min"]}</span>'
                 elif value.get('max'):
-                    filter_html += f'<span class="filter-tag">{key} < {value["max"]}</span>'
+                    filter_html += f'<span class="filter-tag">{name}≤{value["max"]}</span>'
             st.markdown(filter_html, unsafe_allow_html=True)
     
     with col2:
