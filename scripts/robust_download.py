@@ -85,8 +85,9 @@ def main():
                     if has_price:
                         completed_stocks.add(stock_id)
                 else:
-                    # 一般股票嚴格檢查
-                    if has_price and has_roe and has_debt:  # PE 允許為空 (虧損時)
+                    # 一般股票：只要有股價就接受（ROE/負債率可能因虧損或資料延遲而缺失）
+                    # 這樣可以保留台塑、中鋼等重要但暫時虧損的公司
+                    if has_price:
                         completed_stocks.add(stock_id)
             
             print(f"📊 已驗證 {len(completed_stocks)} 檔資料完整")
@@ -140,18 +141,17 @@ def main():
             price = stock_data.get('price')
             roe = stock_data.get('roe')
             
-            # 成功條件判定
+            # 成功條件判定：只要有股價即可（虧損公司可能缺 ROE）
             success = False
-            if is_etf:
-                # ETF: 只要有股價即可 (有些 ETF 有 PE，有些沒有，ROE 通常無)
-                if price:
-                    success = True
+            if price:
+                success = True
+                if is_etf:
                     print(f"✅ 成功 (股價: {price})")
-            else:
-                # 一般個股: 必須有股價 + ROE
-                if price and roe is not None:
-                    success = True
-                    print(f"✅ 成功 (股價: {price}, ROE: {roe})")
+                else:
+                    if roe is not None:
+                        print(f"✅ 成功 (股價: {price}, ROE: {roe})")
+                    else:
+                        print(f"✅ 成功 (股價: {price}, ROE: 無)")
 
             if success:
                 # 更新或新增資料
@@ -162,15 +162,7 @@ def main():
                 # 立即儲存
                 save_progress(pd.DataFrame(data_list))
             else:
-                missing = []
-                if not price: missing.append("股價")
-                if not is_etf and roe is None: missing.append("ROE")
-                
-                if missing:
-                    print(f"⚠️  資料不完整，缺: {', '.join(missing)} (不儲存)")
-                else:
-                    # 針對一般股票有可能缺 debt_ratio 的情況 (雖然 fetch_indicators_lite 盡力算了)
-                    print(f"⚠️  資料不完整 (不儲存)")
+                print(f"⚠️  資料不完整，缺: 股價 (不儲存)")
                 # 不儲存，下次執行會重試
             
             # 強制睡眠補足時間
