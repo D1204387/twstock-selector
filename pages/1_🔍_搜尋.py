@@ -342,10 +342,14 @@ else:
         - 優缺點分析
         
         **快速連結**
-        - 🏆 **[排名](/🏆_排名)** - 查看評分最高的股票
-        - 🎛️ **[篩選](/🎛️_篩選)** - 自訂條件篩選
-        - 🤖 **[AI 選股](/🤖_AI智慧選股)** - 用自然語言查詢
         """)
+        col_l1, col_l2, col_l3 = st.columns(3)
+        with col_l1:
+            st.page_link("pages/3_🏆_排名.py", label="🏆 排名", help="查看評分最高的股票")
+        with col_l2:
+            st.page_link("pages/2_🎛️_篩選.py", label="🎛️ 篩選", help="自訂條件篩選")
+        with col_l3:
+            st.page_link("pages/4_🤖_AI智慧選股.py", label="🤖 AI選股", help="用自然語言查詢")
     
     st.divider()
     

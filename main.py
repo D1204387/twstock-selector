@@ -128,6 +128,7 @@ def main():
             <p>支援股票代號和公司名稱搜尋，顯示完整財務資訊和投資分析。</p>
         </div>
         """, unsafe_allow_html=True)
+        st.page_link("pages/1_🔍_搜尋.py", label="前往搜尋 →", use_container_width=True)
         
         st.markdown("""
         <div class="feature-card">
@@ -135,6 +136,7 @@ def main():
             <p>4 種內建策略：成長股、價值股、高股息、優質股，搭配自訂條件篩選。</p>
         </div>
         """, unsafe_allow_html=True)
+        st.page_link("pages/2_🎛️_篩選.py", label="前往篩選 →", use_container_width=True)
         
         st.markdown("""
         <div class="feature-card">
@@ -142,6 +144,7 @@ def main():
             <p>0-10 分評分系統，Top N 排行榜，支援 CSV 匯出。</p>
         </div>
         """, unsafe_allow_html=True)
+        st.page_link("pages/3_🏆_排名.py", label="前往排名 →", use_container_width=True)
     
     with col2:
         st.markdown('<div class="section-header">內建策略</div>', unsafe_allow_html=True)
@@ -149,11 +152,11 @@ def main():
         for key, strategy in STRATEGIES.items():
             conditions = strategy.get('conditions', {})
             cond_list = []
-            # 簡易中文對照表
+            # 簡易中文對照表（中文優先，英文為輔）
             display_map = {
-                'roe': 'ROE', 'pe': 'PE', 'pb': 'PB', 'eps': 'EPS',
+                'roe': '權益報酬率', 'pe': '本益比', 'pb': '淨值比', 'eps': '每股盈餘',
                 'dividend_yield': '殖利率', 'dividend_years': '配息年數',
-                'debt_ratio': '負債率'
+                'debt_ratio': '負債率', 'net_profit_margin': '淨利率'
             }
 
             for k, v in conditions.items():
@@ -171,6 +174,9 @@ def main():
                 <p>{strategy['description']} · {', '.join(cond_list)}</p>
             </div>
             """, unsafe_allow_html=True)
+        
+        # 策略區塊連結
+        st.page_link("pages/2_🎛️_篩選.py", label="前往策略篩選 →", use_container_width=True)
     
     st.divider()
     
@@ -181,8 +187,8 @@ def main():
         top_stocks = get_top_stocks(df, n=10)
         
         if not top_stocks.empty:
-            # 統一欄位格式，與其他頁面一致
-            display_cols = ['stock_id', 'name', 'price', 'score', 'roe', 'pe', 'pb', 'dividend_yield', 'debt_ratio']
+            # 欄位順序：一般股票指標在前，ETF 指標在後
+            display_cols = ['stock_id', 'name', 'price', 'score', 'roe', 'pe', 'pb', 'debt_ratio', 'dividend_yield', 'dividend_years']
             display_cols = [c for c in display_cols if c in top_stocks.columns]
             display_df = top_stocks[display_cols].copy()
             
@@ -191,7 +197,8 @@ def main():
             
             # 統一欄位名稱（與篩選頁和排名頁一致）
             column_names = {'stock_id': '代號', 'name': '名稱', 'price': '股價', 'score': '評分',
-                            'roe': 'ROE%(40%)', 'pe': 'PE(30%)', 'pb': 'PB(15%)', 'dividend_yield': '殖利率(%)', 'debt_ratio': '負債率%(15%)'}
+                            'roe': '權益報酬率%(40%)', 'pe': '本益比(30%)', 'pb': '淨值比(15%)', 'debt_ratio': '負債率%(15%)',
+                            'dividend_yield': '殖利率%', 'dividend_years': '配息年數'}
             display_df = display_df.rename(columns=column_names)
             
             for col in display_df.select_dtypes(include=['float64']).columns:
@@ -224,8 +231,8 @@ def main():
         
         | 檢查項目 | 對應指標 | 好的標準 |
         |---------|---------|---------|
-        | 公司賺錢嗎？ | ROE（獲利能力）| 越高越好，> 15% 很棒 |
-        | 股價貴不貴？ | PE（本益比）| 10-20 倍算合理 |
+        | 公司賺錢嗎？ | 權益報酬率(ROE)| 越高越好，> 15% 很棒 |
+        | 股價貴不貴？ | 本益比(PE)| 10-20 倍算合理 |
         | 會不會倒？ | 負債率 | 越低越安全，< 50% 較好 |
         | 有股息嗎？ | 殖利率 | > 4% 就算高股息 |
         
@@ -289,8 +296,8 @@ def main():
             #### 🔷 獲利能力（5 項）
             | 指標 | 公式 | 說明 | 理想值 |
             |------|------|------|--------|
-            | ROE | 淨利 ÷ 股東權益 | 衡量公司運用股東資本創造利潤的能力 | > 15% |
-            | ROA | 淨利 ÷ 總資產 | 衡量公司運用總資產創造利潤的效率 | > 8% |
+            | 權益報酬率(ROE) | 淨利 ÷ 股東權益 | 衡量公司運用股東資本創造利潤的能力 | > 15% |
+            | 資產報酬率(ROA) | 淨利 ÷ 總資產 | 衡量公司運用總資產創造利潤的效率 | > 8% |
             | 淨利率 | 淨利 ÷ 營收 | 每一元營收中實際賺取的淨利 | > 10% |
             | 毛利率 | (營收-成本) ÷ 營收 | 每一元營收扣除直接成本後的毛利 | > 20% |
             | 營業利潤率 | 營業利益 ÷ 營收 | 本業經營的獲利能力 | > 10% |
@@ -298,9 +305,9 @@ def main():
             #### 🔷 估值指標（4 項）
             | 指標 | 公式 | 說明 | 理想值 |
             |------|------|------|--------|
-            | PE | 股價 ÷ EPS | 股價相對於每股盈餘的倍數 | 10~20 |
-            | PB | 股價 ÷ 每股淨值 | 股價相對於每股淨值的倍數 | < 2 |
-            | EPS | 稅後淨利 ÷ 股數 | 每一股可分配到的盈餘 | > 3 元 |
+            | 本益比(PE) | 股價 ÷ 每股盈餘 | 股價相對於每股盈餘的倍數 | 10~20 |
+            | 淨值比(PB) | 股價 ÷ 每股淨值 | 股價相對於每股淨值的倍數 | < 2 |
+            | 每股盈餘(EPS) | 稅後淨利 ÷ 股數 | 每一股可分配到的盈餘 | > 3 元 |
             | 殖利率 | 現金股利 ÷ 股價 | 每年現金股利相對於股價的比率 | > 4% |
             
             #### 🔷 其他指標（2 項）

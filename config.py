@@ -7,8 +7,8 @@ Taiwan Stock Selection System - Configuration
 INDICATORS = {
     # 獲利能力指標
     "roe": {
-        "name": "ROE",
-        "full_name": "股東權益報酬率",
+        "name": "權益報酬率(ROE)",
+        "full_name": "權益報酬率 (Return on Equity)",
         "description": "衡量公司運用股東資本創造利潤的能力",
         "formula": "淨利 / 股東權益 × 100%",
         "ideal_min": 15,
@@ -18,8 +18,8 @@ INDICATORS = {
         "interpretation": "越高越好，代表公司善用股東的錢賺取利潤。ROE > 15% 通常被視為優質公司。"
     },
     "roa": {
-        "name": "ROA",
-        "full_name": "資產報酬率",
+        "name": "資產報酬率(ROA)",
+        "full_name": "資產報酬率 (Return on Assets)",
         "description": "衡量公司運用總資產創造利潤的效率",
         "formula": "淨利 / 總資產 × 100%",
         "ideal_min": 8,
@@ -64,8 +64,8 @@ INDICATORS = {
     
     # 估值指標
     "pe": {
-        "name": "本益比",
-        "full_name": "本益比 (P/E Ratio)",
+        "name": "本益比(PE)",
+        "full_name": "本益比 (Price-to-Earnings Ratio)",
         "description": "股價相對於每股盈餘的倍數",
         "formula": "股價 / 每股盈餘 (EPS)",
         "ideal_min": 10,
@@ -75,8 +75,8 @@ INDICATORS = {
         "interpretation": "過高可能代表股價偏貴，過低可能代表被低估。合理區間為 10-20 倍。"
     },
     "pb": {
-        "name": "股價淨值比",
-        "full_name": "股價淨值比 (P/B Ratio)",
+        "name": "淨值比(PB)",
+        "full_name": "淨值比 (Price-to-Book Ratio)",
         "description": "股價相對於每股淨值的倍數",
         "formula": "股價 / 每股淨值",
         "ideal_min": None,
@@ -86,8 +86,8 @@ INDICATORS = {
         "interpretation": "PB < 1 可能代表股價低於帳面價值，PB < 2 通常被視為合理。"
     },
     "eps": {
-        "name": "每股盈餘",
-        "full_name": "每股盈餘 (EPS)",
+        "name": "每股盈餘(EPS)",
+        "full_name": "每股盈餘 (Earnings Per Share)",
         "description": "每一股可分配到的盈餘",
         "formula": "稅後淨利 / 流通在外股數",
         "ideal_min": 3,
@@ -97,7 +97,7 @@ INDICATORS = {
         "interpretation": "越高越好，代表公司獲利能力強。EPS > 3 元為理想標準。"
     },
     "dividend_yield": {
-        "name": "股息率",
+        "name": "殖利率",
         "full_name": "現金殖利率",
         "description": "每年現金股利相對於股價的比率",
         "formula": "每股現金股利 / 股價 × 100%",
@@ -156,7 +156,7 @@ ETF_SCORING_WEIGHTS = {
 # 策略定義
 STRATEGIES = {
     "growth": {
-        "name": "🚀 成長潛力",
+        "name": "🚀 成長股",
         "description": "高獲利效率且財務結構佳",
         "conditions": {
             "roe": {"min": 20},              # 高 ROE 代替成長率

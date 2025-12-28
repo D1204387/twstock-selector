@@ -191,17 +191,17 @@ def format_strategy_conditions(strategy_key: str) -> List[str]:
 
 
 def get_indicator_display_name(indicator_key: str) -> str:
-    """取得指標顯示名稱"""
+    """取得指標顯示名稱 (中文優先，英文縮寫為輔)"""
     names = {
-        'roe': 'ROE',
-        'roa': 'ROA',
+        'roe': '權益報酬率(ROE)',
+        'roa': '資產報酬率(ROA)',
         'net_profit_margin': '淨利率',
         'gross_margin': '毛利率',
         'operating_margin': '營業利潤率',
-        'pe': '本益比',
-        'pb': '股價淨值比',
-        'eps': 'EPS',
-        'dividend_yield': '股息率',
+        'pe': '本益比(PE)',
+        'pb': '淨值比(PB)',
+        'eps': '每股盈餘(EPS)',
+        'dividend_yield': '殖利率',
         'dividend_years': '配息年數',
         'debt_ratio': '負債率'
     }

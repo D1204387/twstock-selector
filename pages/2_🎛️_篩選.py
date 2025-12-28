@@ -199,6 +199,7 @@ with st.expander("⚙️ 自訂篩選條件", expanded=(selected_strategy is Non
 if selected_strategy:
     filtered_df = apply_strategy(df, selected_strategy)
     filter_mode = f"策略：{STRATEGIES[selected_strategy]['name']}"
+    st.success(f"✅ 已選擇策略：**{STRATEGIES[selected_strategy]['name']}**，共 {len(filtered_df)} 檔符合條件")
 else:
     filters = {}
     if roe_min > 0: filters['roe'] = {'min': roe_min}
@@ -268,7 +269,8 @@ else:
         end_idx = total_count
         st.caption(f"顯示全部 {total_count} 筆")
     
-    display_cols = ['stock_id', 'name', 'price', 'score', 'roe', 'pe', 'pb', 'dividend_yield', 'debt_ratio']
+    # 欄位順序：一般股票指標在前，ETF 指標在後
+    display_cols = ['stock_id', 'name', 'price', 'score', 'roe', 'pe', 'pb', 'debt_ratio', 'dividend_yield', 'dividend_years']
     display_cols = [c for c in display_cols if c in filtered_df.columns]
     display_df = filtered_df[display_cols].iloc[start_idx:end_idx].copy()
     
@@ -276,14 +278,15 @@ else:
     display_df.insert(0, '序號', range(start_idx + 1, end_idx + 1))
     
     column_names = {'stock_id': '代號', 'name': '名稱', 'price': '股價', 'score': '評分',
-                    'roe': '權益報酬率%', 'pe': '本益比', 'pb': '淨值比', 'dividend_yield': '殖利率%', 'debt_ratio': '負債率%'}
+                    'roe': '權益報酬率%', 'pe': '本益比', 'pb': '淨值比', 'debt_ratio': '負債率%',
+                    'dividend_yield': '殖利率%', 'dividend_years': '配息年數'}
     display_df = display_df.rename(columns=column_names)
     
     for col in display_df.select_dtypes(include=['float64']).columns:
         display_df[col] = display_df[col].round(2)
     
     # 評分權重說明
-    st.caption("📊 **評分權重** — 一般股票：ROE 40% + PE 30% + PB 15% + 負債率 15% ｜ ETF：殖利率 80% + 配息年數 20%")
+    st.caption("📊 **評分權重** — 一般股票：權益報酬率(ROE) 40% + 本益比(PE) 30% + 淨值比(PB) 15% + 負債率 15% ｜ ETF：殖利率 80% + 配息年數 20%")
     
     st.dataframe(display_df, use_container_width=True, hide_index=True)
     

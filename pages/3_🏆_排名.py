@@ -144,19 +144,21 @@ else:
     display_df['排名'] = range(1, len(display_df) + 1)
     display_df['等級'] = display_df['score'].apply(get_score_grade)
     
-    display_cols = ['排名', 'stock_id', 'name', 'price', 'score', '等級', 'roe', 'pe', 'pb', 'dividend_yield', 'debt_ratio']
+    # 欄位順序：一般股票指標在前，ETF 指標在後
+    display_cols = ['排名', 'stock_id', 'name', 'price', 'score', '等級', 'roe', 'pe', 'pb', 'debt_ratio', 'dividend_yield', 'dividend_years']
     display_cols = [c for c in display_cols if c in display_df.columns or c in ['排名', '等級']]
     result_df = display_df[display_cols].copy()
     
     column_names = {'stock_id': '代號', 'name': '名稱', 'price': '股價', 'score': '評分',
-                    'roe': '權益報酬率%', 'pe': '本益比', 'pb': '淨值比', 'dividend_yield': '殖利率%', 'debt_ratio': '負債率%'}
+                    'roe': '權益報酬率%', 'pe': '本益比', 'pb': '淨值比', 'debt_ratio': '負債率%', 
+                    'dividend_yield': '殖利率%', 'dividend_years': '配息年數'}
     result_df = result_df.rename(columns=column_names)
     
     for col in result_df.select_dtypes(include=['float64']).columns:
         result_df[col] = result_df[col].round(2)
     
     # 評分權重說明
-    st.caption("📊 **評分權重** — 一般股票：ROE 40% + PE 30% + PB 15% + 負債率 15% ｜ ETF：殖利率 80% + 配息年數 20%")
+    st.caption("📊 **評分權重** — 一般股票：權益報酬率(ROE) 40% + 本益比(PE) 30% + 淨值比(PB) 15% + 負債率 15% ｜ ETF：殖利率 80% + 配息年數 20%")
     
     st.dataframe(result_df, use_container_width=True, hide_index=True)
     
