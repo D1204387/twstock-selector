@@ -128,7 +128,6 @@ def main():
             <p>支援股票代號和公司名稱搜尋，顯示完整財務資訊和投資分析。</p>
         </div>
         """, unsafe_allow_html=True)
-        st.page_link("pages/1_🔍_搜尋.py", label="前往搜尋 →", use_container_width=True)
         
         st.markdown("""
         <div class="feature-card">
@@ -136,7 +135,6 @@ def main():
             <p>4 種內建策略：成長股、價值股、高股息、優質股，搭配自訂條件篩選。</p>
         </div>
         """, unsafe_allow_html=True)
-        st.page_link("pages/2_🎛️_篩選.py", label="前往篩選 →", use_container_width=True)
         
         st.markdown("""
         <div class="feature-card">
@@ -144,39 +142,33 @@ def main():
             <p>0-10 分評分系統，Top N 排行榜，支援 CSV 匯出。</p>
         </div>
         """, unsafe_allow_html=True)
-        st.page_link("pages/3_🏆_排名.py", label="前往排名 →", use_container_width=True)
     
     with col2:
-        st.markdown('<div class="section-header">內建策略</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">資料特色</div>', unsafe_allow_html=True)
         
-        for key, strategy in STRATEGIES.items():
-            conditions = strategy.get('conditions', {})
-            cond_list = []
-            # 簡易中文對照表（中文優先，英文為輔）
-            display_map = {
-                'roe': '權益報酬率', 'pe': '本益比', 'pb': '淨值比', 'eps': '每股盈餘',
-                'dividend_yield': '殖利率', 'dividend_years': '配息年數',
-                'debt_ratio': '負債率', 'net_profit_margin': '淨利率'
-            }
-
-            for k, v in conditions.items():
-                name = display_map.get(k, k.upper())
-                if v.get('min') and v.get('max'):
-                    cond_list.append(f"{name} {v['min']}~{v['max']}")
-                elif v.get('min'):
-                    cond_list.append(f"{name}≥{v['min']}")
-                elif v.get('max'):
-                    cond_list.append(f"{name}≤{v['max']}")
-            
-            st.markdown(f"""
-            <div class="feature-card">
-                <h4>{strategy['name']}</h4>
-                <p>{strategy['description']} · {', '.join(cond_list)}</p>
-            </div>
-            """, unsafe_allow_html=True)
+        # 動態取得統計數據
+        stock_count = len(df) if not df.empty else 120
         
-        # 策略區塊連結
-        st.page_link("pages/2_🎛️_篩選.py", label="前往策略篩選 →", use_container_width=True)
+        st.markdown(f"""
+        <div class="feature-card">
+            <h4>📊 涵蓋範圍</h4>
+            <p>{stock_count} 檔（台灣50+中型100+ETF10）</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div class="feature-card">
+            <h4>📈 分析深度</h4>
+            <p>11 項財務指標</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div class="feature-card">
+            <h4>🔗 資料來源</h4>
+            <p>FinMind 真實數據</p>
+        </div>
+        """, unsafe_allow_html=True)
     
     st.divider()
     
