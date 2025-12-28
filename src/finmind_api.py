@@ -895,234 +895,8 @@ def fetch_indicators_full(stock_id: str, token: str = None) -> Dict:
     return result
 
 
-def fetch_indicators_lite(stock_id: str, token: str = None) -> Dict:
-    """取得個股指標（輕量版 - 只需 3 次 API 請求）
-    
-    優化策略：
-    - 合併財務報表請求（ROE/ROA/EPS 都在同一個資料集）
-    - 省略月營收（用模擬資料替代）
-    - 使用 PE/PB 資料集中的價格計算殖利率
-    
-    Args:
-        stock_id: 股票代號
-        token: API Token
-        
-    Returns:
-        包含財務指標的字典
-    """
-    result = {
-        'stock_id': stock_id,
-        'roe': None, 'roa': None, 'eps': None,
-        'net_profit_margin': None, 'gross_margin': None,
-        'operating_margin': None, 'debt_ratio': None,
-        'pe': None, 'pb': None, 'dividend_yield': None,
-        'dividend_years': 0, 'revenue_growth': None,
-        'eps_growth': None, 'price': None,
-    }
-    
-    # === 請求 1: PE/PB + 股價 (TaiwanStockPER) ===
-    end_date = datetime.now().strftime("%Y-%m-%d")
-    start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
-    
-    df_per = get_finmind_data("TaiwanStockPER", stock_id, start_date, end_date, token)
-    if not df_per.empty:
-        latest = df_per.iloc[-1]
-        result['pe'] = float(latest.get('PER', 0)) if latest.get('PER') else None
-        result['pb'] = float(latest.get('PBR', 0)) if latest.get('PBR') else None
-        result['price'] = float(latest.get('close', 0)) if latest.get('close') else None
-    
-    # 如果沒有取得股價，額外呼叫股價 API
-    if result['price'] is None:
-        result['price'] = fetch_stock_price(stock_id, token)
-    
-    time.sleep(0.15)
-    
-    # === 請求 2: 股利 (TaiwanStockDividend) ===
-    start_date = (datetime.now() - timedelta(days=365*5)).strftime("%Y-%m-%d")
-    
-    df_div = get_finmind_data("TaiwanStockDividend", stock_id, start_date, end_date, token)
-    if not df_div.empty:
-        # 配息年數
-        if 'year' in df_div.columns:
-            try:
-                years = sorted([int(y) for y in df_div['year'].unique()], reverse=True)
-                result['dividend_years'] = len(years)
-            except:
-                result['dividend_years'] = len(df_div['year'].unique())
-        
-        # 殖利率計算
-        if 'CashEarningsDistribution' in df_div.columns:
-            latest_div = df_div[df_div['date'] == df_div['date'].max()]
-            if not latest_div.empty:
-                try:
-                    cash_div = latest_div['CashEarningsDistribution'].sum()
-                    if cash_div and result['price'] and result['price'] > 0:
-                        result['dividend_yield'] = round((float(cash_div) / result['price']) * 100, 2)
-                except:
-                    pass
-    
-    time.sleep(0.15)
-    
-    # === 請求 3: 財務報表 (TaiwanStockFinancialStatements) ===
-    start_date = (datetime.now() - timedelta(days=400)).strftime("%Y-%m-%d")
-    
-    df_fin = get_finmind_data("TaiwanStockFinancialStatements", stock_id, start_date, end_date, token)
-    if not df_fin.empty:
-        latest_date = df_fin['date'].max()
-        latest = df_fin[df_fin['date'] == latest_date]
-        
-        # 季度判斷（用於 ROE/ROA 年化）
-        quarter = None
-        try:
-            month = pd.to_datetime(latest_date).month
-            if month <= 3: quarter = 4
-            elif month <= 5: quarter = 1
-            elif month <= 8: quarter = 2
-            elif month <= 11: quarter = 3
-            else: quarter = 3
-        except:
-            pass
-        
-        # 暫存計算用的原始數據
-        raw_data = {
-            'NetIncome': None, 'Revenue': None, 'Equity': None,
-            'GrossProfit': None, 'OperatingIncome': None,
-            'TotalLiabilities': None, 'TotalAssets': None  # 用於計算負債率
-        }
-
-        for _, row in latest.iterrows():
-            item_type = str(row.get('type', '')).lower()
-            try:
-                val = float(row.get('value')) if row.get('value') is not None else None
-            except:
-                val = None
-            
-            if val is not None:
-                # 收集原始數據
-                # 修正：避免抓到 "NonControllingInterest" (3.8e8) 覆蓋真正的 NetIncome (4.5e11)
-                # IncomeAfterTaxes = 本期淨利 (通常指歸屬於母公司)
-                if ('incomeaftertaxes' in item_type or 'netincome' in item_type) and 'non' not in item_type: 
-                     raw_data['NetIncome'] = val
-                elif 'equityattributabletoownersofparent' in item_type: # 權益總額
-                     raw_data['Equity'] = val
-                elif 'revenue' in item_type and 'non' not in item_type: # 營收
-                     raw_data['Revenue'] = val
-                elif 'grossprofit' in item_type: # 毛利
-                     raw_data['GrossProfit'] = val
-                elif 'operatingincome' in item_type: # 營業利益
-                     raw_data['OperatingIncome'] = val
-                elif 'totalliabilities' in item_type and 'non' not in item_type: # 總負債
-                     raw_data['TotalLiabilities'] = val
-                elif 'totalassets' in item_type and 'non' not in item_type: # 總資產
-                     raw_data['TotalAssets'] = val
-
-                # 嘗試直接讀取（雖然現在 API 可能沒給）
-                if 'roe' in item_type or '股東權益報酬率' in item_type:
-                    if quarter and quarter < 4:
-                        result['roe'] = round(val / quarter * 4, 2)
-                    else:
-                        result['roe'] = val
-                elif 'roa' in item_type or '資產報酬率' in item_type:
-                    if quarter and quarter < 4:
-                        result['roa'] = round(val / quarter * 4, 2)
-                    else:
-                        result['roa'] = val
-                elif '基本每股盈餘' in item_type or 'eps' in item_type:
-                    result['eps'] = val
-                elif '淨利率' in item_type:
-                    result['net_profit_margin'] = val
-                elif '毛利率' in item_type:
-                    result['gross_margin'] = val
-                elif '營業利益率' in item_type:
-                    result['operating_margin'] = val
-                elif '負債比率' in item_type:
-                    result['debt_ratio'] = val
-        
-        # 手動計算補充
-        
-        # 0. ROE 補救策略 B: 使用 PB / PE 推算
-        # ROE = EPS / BPS = (Price/PE) / (Price/PB) = PB / PE
-        # 這是最穩健的算法，因為 PE/PB 通常都有值
-        if result['roe'] is None and result['pe'] and result['pb'] and result['pe'] > 0:
-            try:
-                implied_roe = (result['pb'] / result['pe']) * 100
-                result['roe'] = round(implied_roe, 2)
-            except:
-                pass
-
-        # 1. ROE 補救策略 A: NetIncome / Equity (如果策略 B 失敗)
-        if result['roe'] is None and raw_data['NetIncome'] and raw_data['Equity'] and raw_data['Equity'] != 0:
-            current_roe = (raw_data['NetIncome'] / raw_data['Equity']) * 100
-            # 年化處理：根據季度判斷
-            # FinMind FinancialStatements 的 IncomeAfterTaxes 可能是單季或累計值
-            # 最安全的做法是根據 quarter 來決定年化倍數
-            if quarter:
-                if quarter == 4:
-                    # Q4 財報 = 全年數據，不需年化
-                    result['roe'] = round(current_roe, 2)
-                else:
-                    # Q1/Q2/Q3 財報 = 累計值，需年化 (除以季數再乘4)
-                    result['roe'] = round(current_roe / quarter * 4, 2)
-            else:
-                # 無法判斷季度時，保守處理：不年化，直接使用原值
-                # 避免錯誤年化導致 ROE 異常偏高
-                result['roe'] = round(current_roe, 2)
-
-        # === ROE 合理性檢查 ===
-        # 1. 極端值過濾：ROE 超過 ±100% 視為異常，設為 None
-        if result['roe'] is not None:
-            if result['roe'] > 100 or result['roe'] < -100:
-                result['roe'] = None
-            # 2. 邏輯矛盾檢查：EPS 為負但 ROE 為正（且 > 20%），視為計算錯誤
-            elif result['eps'] is not None and result['eps'] < 0 and result['roe'] > 20:
-                result['roe'] = None
-
-        # 2. 淨利率 = NetIncome / Revenue
-        if result['net_profit_margin'] is None and raw_data['NetIncome'] and raw_data['Revenue'] and raw_data['Revenue'] != 0:
-            result['net_profit_margin'] = round((raw_data['NetIncome'] / raw_data['Revenue']) * 100, 2)
-
-        # 3. 毛利率 = GrossProfit / Revenue
-        if result['gross_margin'] is None and raw_data['GrossProfit'] and raw_data['Revenue'] and raw_data['Revenue'] != 0:
-            result['gross_margin'] = round((raw_data['GrossProfit'] / raw_data['Revenue']) * 100, 2)
-            
-        # 4. 負債比率 = TotalLiabilities / TotalAssets (從 FinancialStatements 嘗試)
-        if result['debt_ratio'] is None and raw_data.get('TotalLiabilities') and raw_data.get('TotalAssets') and raw_data.get('TotalAssets') != 0:
-            result['debt_ratio'] = round((raw_data['TotalLiabilities'] / raw_data['TotalAssets']) * 100, 2)
-
-    time.sleep(0.15)
-    
-    # === 請求 4: 資產負債表 (TaiwanStockBalanceSheet) - 用於負債率 ===
-    if result['debt_ratio'] is None:
-        df_bs = get_finmind_data("TaiwanStockBalanceSheet", stock_id, start_date, end_date, token)
-        if not df_bs.empty:
-            latest_date = df_bs['date'].max()
-            latest = df_bs[df_bs['date'] == latest_date]
-            
-            total_assets = None
-            total_liabilities = None
-            
-            for _, row in latest.iterrows():
-                item_type = str(row.get('type', '')).lower()
-                try:
-                    val = float(row.get('value')) if row.get('value') is not None else None
-                except:
-                    val = None
-                
-                if val is not None:
-                    if item_type == 'totalassets':
-                        total_assets = val
-                    elif item_type == 'liabilities':
-                        total_liabilities = val
-            
-            if total_assets and total_liabilities and total_assets != 0:
-                result['debt_ratio'] = round((total_liabilities / total_assets) * 100, 2)
-
-    return result
-
-
 def batch_fetch_indicators(stock_ids: List[str], token: str = None, 
-                           progress_callback=None, batch_size: int = 100,
-                           use_lite: bool = True) -> pd.DataFrame:
+                           progress_callback=None, batch_size: int = 100) -> pd.DataFrame:
     """批次取得多檔股票的所有指標
     
     Args:
@@ -1130,7 +904,6 @@ def batch_fetch_indicators(stock_ids: List[str], token: str = None,
         token: API Token
         progress_callback: 進度回調函數 (current, total, stock_id)
         batch_size: 每批處理數量
-        use_lite: 使用輕量版（3次請求/檔）或完整版（6次請求/檔）
         
     Returns:
         包含所有股票財務指標的 DataFrame
@@ -1138,20 +911,15 @@ def batch_fetch_indicators(stock_ids: List[str], token: str = None,
     all_data = []
     total = len(stock_ids)
     
-    mode = "輕量版（3次請求/檔）" if use_lite else "完整版（6次請求/檔）"
-    print(f"📊 開始批次取得 {total} 檔股票的財務資料（{mode}）...")
-    print(f"💡 預估 API 請求數: {total * (3 if use_lite else 6)} 次")
+    print(f"📊 開始批次取得 {total} 檔股票的財務資料（完整版 - 7次請求/檔）...")
+    print(f"💡 預估 API 請求數: {total * 7} 次")
     
     for i, stock_id in enumerate(stock_ids):
         if progress_callback:
             progress_callback(i + 1, total, stock_id)
         
         try:
-            # 使用輕量版或完整版
-            if use_lite:
-                data = fetch_indicators_lite(stock_id, token)
-            else:
-                data = fetch_all_indicators(stock_id, token)
+            data = fetch_indicators_full(stock_id, token)
             all_data.append(data)
             
             if (i + 1) % 10 == 0:

@@ -119,9 +119,8 @@ def main():
             
             print(f"[{current_idx}/{len(all_stocks)}] 下載 {stock_id} ... ", end="", flush=True)
             
-            # 使用 lite 版 (3 次 API 請求)
-            # 因為 fetch_indicators_lite 內部已有 sleep，但我們要更嚴格控制
-            # 所以這裡我們手動計算時間
+            # 使用完整版 (7 次 API 請求)
+            # fetch_indicators_full 內部有 sleep，但我們仍在外部控制速率
             
             try:
                 stock_data = fetch_indicators_full(stock_id, token)  # 完整版
