@@ -363,7 +363,7 @@ class TestCustomScreen:
     def test_screen_by_roe(self):
         """測試 ROE 篩選"""
         import pandas as pd
-        from stock_analyzer import custom_screen
+        from stock_screener import custom_screen
         
         df = pd.DataFrame([
             {'stock_id': '2330', 'roe': 25.0, 'pe': 20.0},
@@ -380,7 +380,7 @@ class TestCustomScreen:
     def test_screen_by_multiple_conditions(self):
         """測試多條件篩選"""
         import pandas as pd
-        from stock_analyzer import custom_screen
+        from stock_screener import custom_screen
         
         df = pd.DataFrame([
             {'stock_id': '2330', 'roe': 25.0, 'pe': 20.0, 'debt_ratio': 30.0},
