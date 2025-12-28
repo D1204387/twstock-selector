@@ -28,6 +28,12 @@ from src.stock_analyzer import get_top_stocks
 from src.styles import GLARITY_STYLE
 from config import STRATEGIES
 from src.help_docs import SCORING_HELP
+from src.env_validator import validate_env_vars
+
+# 驗證環境變數
+_env_result = validate_env_vars(verbose=False)
+if not _env_result['finmind_token']:
+    st.warning("⚠️ 未設定 FINMIND_TOKEN，資料更新功能無法使用。請參閱 `.env.example` 設定說明。")
 
 # 初始化資料庫
 # init_db()

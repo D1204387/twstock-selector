@@ -156,11 +156,20 @@ if keyword:
                 </div>
                 """, unsafe_allow_html=True)
             
-            # 虧損警示
-            eps_val = stock.get('eps')
+            # ROE 異常警示（更詳細的分級警示）
             roe_val = stock.get('roe')
-            if (pd.notna(eps_val) and eps_val < 0) or (pd.notna(roe_val) and roe_val < 0):
-                st.warning("⚠️ **虧損警示**：該公司 EPS 或 ROE 為負值，請審慎評估投資風險。")
+            if pd.notna(roe_val):
+                is_abnormal, reason, severity = is_roe_abnormal(roe_val)
+                if is_abnormal:
+                    if severity == 'danger':
+                        st.error(f"🚨 **ROE 異常警示**：{reason}")
+                    else:  # warning
+                        st.warning(f"⚠️ **ROE 注意**：{reason}")
+            
+            # EPS 虧損警示
+            eps_val = stock.get('eps')
+            if pd.notna(eps_val) and eps_val < 0:
+                st.warning(f"⚠️ **EPS 虧損**：每股盈餘為負值 ({eps_val:.2f} 元)，請審慎評估投資風險。")
             
             st.divider()
             
