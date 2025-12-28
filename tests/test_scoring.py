@@ -229,6 +229,171 @@ class TestIsROEAbnormal:
         assert is_abnormal is False
 
 
+# ==============================================================================
+# 整合測試 (Integration Tests)
+# ==============================================================================
+
+class TestCalculateScore:
+    """測試 calculate_score 整合評分函數"""
+    
+    def test_etf_scoring_high_yield(self):
+        """測試 ETF 高殖利率評分"""
+        import pandas as pd
+        from stock_analyzer import calculate_score
+        
+        etf_data = pd.DataFrame([{
+            'stock_id': '0056',
+            'dividend_yield': 7.0,
+            'pb': 1.0,
+            'dividend_years': 10,
+            'roe': None,  # ETF 無 ROE
+            'pe': None,
+            'debt_ratio': None,
+        }])
+        result = calculate_score(etf_data)
+        
+        # ETF 高殖利率 + 長期配息應得高分
+        assert result.iloc[0]['score'] >= 8
+    
+    def test_etf_scoring_without_pb(self):
+        """測試 ETF 無 PB 時的評分"""
+        import pandas as pd
+        from stock_analyzer import calculate_score
+        
+        etf_data = pd.DataFrame([{
+            'stock_id': '00919',
+            'dividend_yield': 9.6,
+            'pb': None,  # 無 PB
+            'dividend_years': 5,
+            'roe': None,
+            'pe': None,
+            'debt_ratio': None,
+        }])
+        result = calculate_score(etf_data)
+        
+        # 應使用殖利率 80% + 配息年數 20% 評分
+        assert result.iloc[0]['score'] >= 8
+    
+    def test_stock_scoring_high_quality(self):
+        """測試優質股票評分"""
+        import pandas as pd
+        from stock_analyzer import calculate_score
+        
+        stock_data = pd.DataFrame([{
+            'stock_id': '2330',
+            'roe': 25.0,
+            'pe': 15.0,
+            'pb': 1.5,
+            'debt_ratio': 30.0,
+            'dividend_yield': 3.0,
+            'dividend_years': 10,
+        }])
+        result = calculate_score(stock_data)
+        
+        # 高 ROE + 合理 PE + 低負債應得高分
+        assert result.iloc[0]['score'] >= 8
+    
+    def test_stock_scoring_loss_making(self):
+        """測試虧損股票評分"""
+        import pandas as pd
+        from stock_analyzer import calculate_score
+        
+        stock_data = pd.DataFrame([{
+            'stock_id': '2337',
+            'roe': -10.0,
+            'pe': 0,
+            'pb': 2.0,
+            'debt_ratio': 50.0,
+            'dividend_yield': 0,
+            'dividend_years': 0,
+        }])
+        result = calculate_score(stock_data)
+        
+        # 虧損股票應得低分
+        assert result.iloc[0]['score'] < 5
+
+
+class TestAnalyzeStock:
+    """測試 analyze_stock 分析函數"""
+    
+    def test_analyze_regular_stock(self):
+        """測試一般股票分析"""
+        from stock_analyzer import analyze_stock
+        
+        stock = {
+            'stock_id': '2330',
+            'name': '台積電',
+            'roe': 25.0,
+            'pe': 20.0,
+            'pb': 5.0,
+            'debt_ratio': 30.0,
+            'dividend_yield': 2.0,
+        }
+        result = analyze_stock(stock)
+        
+        assert 'score' in result
+        assert 'grade' in result
+        assert 'strengths' in result
+        assert 'weaknesses' in result
+        assert result['score'] >= 0
+        assert result['score'] <= 10
+    
+    def test_analyze_etf(self):
+        """測試 ETF 分析"""
+        from stock_analyzer import analyze_stock
+        
+        etf = {
+            'stock_id': '0056',
+            'name': '元大高股息',
+            'dividend_yield': 7.0,
+            'pb': 1.0,
+            'dividend_years': 10,
+            'roe': None,
+        }
+        result = analyze_stock(etf)
+        
+        assert 'score' in result
+        # ETF 高殖利率應有優點
+        assert len(result['strengths']) > 0 or result['score'] >= 7
+
+
+class TestCustomScreen:
+    """測試 custom_screen 篩選函數"""
+    
+    def test_screen_by_roe(self):
+        """測試 ROE 篩選"""
+        import pandas as pd
+        from stock_analyzer import custom_screen
+        
+        df = pd.DataFrame([
+            {'stock_id': '2330', 'roe': 25.0, 'pe': 20.0},
+            {'stock_id': '2317', 'roe': 15.0, 'pe': 15.0},
+            {'stock_id': '2337', 'roe': -5.0, 'pe': 0},
+        ])
+        
+        conditions = {'roe': {'min': 20}}
+        result = custom_screen(df, conditions)
+        
+        assert len(result) == 1
+        assert result.iloc[0]['stock_id'] == '2330'
+    
+    def test_screen_by_multiple_conditions(self):
+        """測試多條件篩選"""
+        import pandas as pd
+        from stock_analyzer import custom_screen
+        
+        df = pd.DataFrame([
+            {'stock_id': '2330', 'roe': 25.0, 'pe': 20.0, 'debt_ratio': 30.0},
+            {'stock_id': '2317', 'roe': 15.0, 'pe': 15.0, 'debt_ratio': 50.0},
+            {'stock_id': '2412', 'roe': 20.0, 'pe': 12.0, 'debt_ratio': 40.0},
+        ])
+        
+        conditions = {'roe': {'min': 15}, 'pe': {'max': 18}, 'debt_ratio': {'max': 45}}
+        result = custom_screen(df, conditions)
+        
+        assert len(result) == 1
+        assert result.iloc[0]['stock_id'] == '2412'
+
 # 執行測試
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
