@@ -13,7 +13,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.data_fetcher import get_stock_list, generate_sample_data, load_robust_data
-from src.stock_analyzer import analyze_stock, get_score_grade
+from src.stock_analyzer import analyze_stock, get_score_grade, is_roe_abnormal
 from src.indicators import get_indicators_by_category
 from src.styles import GLARITY_STYLE
 from config import INDICATORS
@@ -203,8 +203,18 @@ if keyword:
                                 st.markdown(f"**{info.get('name', key)}**", help=help_text)
                             with c2:
                                 if pd.notna(value):
-                                    # 虧損標示：負值顯示紅色
-                                    if value < 0:
+                                    # 特別處理 ROE 異常值
+                                    if key == 'roe':
+                                        is_abnormal, reason, severity = is_roe_abnormal(value)
+                                        if is_abnormal:
+                                            if severity == 'danger':
+                                                st.markdown(f"🔴 <span style='color: red;' title='{reason}'>{value:.2f}{info.get('unit', '')}</span>", unsafe_allow_html=True)
+                                            else:  # warning
+                                                st.markdown(f"🟡 <span style='color: orange;' title='{reason}'>{value:.2f}{info.get('unit', '')}</span>", unsafe_allow_html=True)
+                                        else:
+                                            st.markdown(f"{value:.2f}{info.get('unit', '')}")
+                                    # 其他指標：負值顯示紅色
+                                    elif value < 0:
                                         st.markdown(f"🔴 <span style='color: red;'>{value:.2f}{info.get('unit', '')}</span>", unsafe_allow_html=True)
                                     else:
                                         st.markdown(f"{value:.2f}{info.get('unit', '')}")

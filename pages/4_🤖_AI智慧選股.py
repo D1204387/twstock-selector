@@ -273,29 +273,22 @@ if query:
             
             # 匯出全部資料的 CSV
             st.markdown("---")
-            st.markdown(f"**匯出全部 {len(filtered_df)} 檔資料**")
             
             # 準備 CSV 資料（含序號）
             export_df = filtered_df[display_cols].copy()
             export_df.insert(0, '序號', range(1, len(export_df) + 1))
             export_df = export_df.rename(columns=column_names)
             
-            # 儲存到專案目錄
-            from pathlib import Path
-            from datetime import datetime
+            # 使用 st.download_button 讓用戶直接下載
+            csv_data = export_df.to_csv(index=False, encoding='utf-8-sig')
             
-            export_dir = Path(__file__).parent.parent / "exports"
-            export_dir.mkdir(exist_ok=True)
-            
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            export_path = export_dir / f"AI選股結果_{timestamp}.csv"
-            
-            if st.button(f"💾 儲存 CSV 到本機 ({len(filtered_df)} 檔)", type="primary"):
-                export_df.to_csv(export_path, index=False, encoding='utf-8-sig')
-                st.success(f"✅ 已儲存到：{export_path}")
-                st.info(f"📂 請到 Finder 開啟：{export_dir}")
-            
-            st.caption("💡 點擊按鈕後，檔案會儲存到專案的 exports 資料夾")
+            st.download_button(
+                label=f"📥 匯出 CSV ({len(filtered_df)} 檔)",
+                data=csv_data.encode('utf-8-sig'),
+                file_name=f"AI選股結果_{len(filtered_df)}檔.csv",
+                mime="text/csv",
+                type="primary"
+            )
     else:
         st.info("🤔 無法解析查詢條件，請嘗試更明確的描述")
 

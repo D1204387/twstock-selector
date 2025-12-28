@@ -98,13 +98,24 @@ def calculate_score(df: pd.DataFrame, weights: Dict = None) -> pd.DataFrame:
 
 
 def score_roe(roe: float) -> float:
-    """ROE 評分函數"""
+    """ROE 評分函數
+    
+    極端值處理：
+    - ROE < -50%：嚴重虧損，給 0 分
+    - ROE < 0%：虧損，給 0 分
+    - ROE > 60%：可能為一次性獲利或會計處理，仍給滿分但需警示
+    """
     if roe is None or pd.isna(roe):
         return 0
     
-    if roe <= 0:
-        return 0
-    elif roe < 5:
+    # 極端負值處理
+    if roe <= -50:
+        return 0  # 嚴重虧損
+    elif roe <= 0:
+        return 0  # 虧損
+    
+    # 正常評分邏輯
+    if roe < 5:
         return roe / 5 * 2
     elif roe < 10:
         return 2 + (roe - 5) / 5 * 2
@@ -115,7 +126,31 @@ def score_roe(roe: float) -> float:
     elif roe < 25:
         return 8 + (roe - 20) / 5 * 2
     else:
-        return 10
+        return 10  # 25% 以上滿分（含極端高值）
+
+
+def is_roe_abnormal(roe: float) -> tuple:
+    """判斷 ROE 是否為異常值
+    
+    Returns:
+        (is_abnormal: bool, reason: str, severity: str)
+        severity: 'warning' (黃色警告) 或 'danger' (紅色警告)
+    """
+    if roe is None or pd.isna(roe):
+        return False, "", ""
+    
+    if roe < -50:
+        return True, "嚴重虧損 (ROE < -50%)", "danger"
+    elif roe < -20:
+        return True, "大幅虧損 (ROE < -20%)", "danger"
+    elif roe < 0:
+        return True, "虧損 (ROE < 0%)", "warning"
+    elif roe > 80:
+        return True, "異常高值，可能為一次性獲利 (ROE > 80%)", "danger"
+    elif roe > 60:
+        return True, "偏高，建議確認獲利來源 (ROE > 60%)", "warning"
+    
+    return False, "", ""
 
 
 def score_pe(pe: float) -> float:
