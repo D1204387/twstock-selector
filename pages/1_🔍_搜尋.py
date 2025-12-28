@@ -218,20 +218,42 @@ if keyword:
                 is_etf = str(stock.get('stock_id', '')).startswith('00')
                 
                 if is_etf:
-                    # ETF 專用雷達圖：殖利率、PB、配息年數
-                    categories_radar = ['殖利率', 'PB', '配息年數']
-                    div_s = min(10, max(0, (stock.get('dividend_yield', 0) or 0) * 1.5))  # 7% = 10分
-                    pb = stock.get('pb', 1.5) or 1.5
-                    pb_s = min(10, max(0, (2 - pb) * 5))  # PB=0 得 10分, PB=2 得 0分
-                    years_s = min(10, max(0, (stock.get('dividend_years', 0) or 0) * 2))  # 5年 = 10分
+                    # ETF 專用雷達圖：5 個維度
+                    categories_radar = ['殖利率', '折溢價(PB)', '配息穩定度', '分散風險', '追蹤效率']
+                    
+                    # 殖利率（7%+ = 滿分）
+                    div_yield = stock.get('dividend_yield', 0) or 0
+                    div_s = min(10, max(0, div_yield * 1.2))  # 8% = 9.6分
+                    
+                    # PB（折溢價，ETF PB < 1 代表折價買入）
+                    pb = stock.get('pb', 1) or 1
+                    if pb <= 1:
+                        pb_s = 10  # 折價 = 滿分
+                    elif pb <= 1.05:
+                        pb_s = 8   # 小幅溢價
+                    elif pb <= 1.1:
+                        pb_s = 6   # 中度溢價
+                    else:
+                        pb_s = max(0, 10 - (pb - 1) * 20)  # 溢價越高分數越低
+                    
+                    # 配息穩定度（連續配息年數，5年+ = 滿分）
+                    years = stock.get('dividend_years', 0) or 0
+                    years_s = min(10, years * 2)  # 5年 = 10分
+                    
+                    # 分散風險（ETF 固有優勢，給予高分）
+                    diversify_s = 9  # ETF 天生分散風險
+                    
+                    # 追蹤效率（假設良好，根據殖利率間接評估）
+                    track_s = min(10, 7 + div_yield * 0.3) if div_yield > 3 else 6
                     
                     fig = go.Figure()
                     fig.add_trace(go.Scatterpolar(
-                        r=[div_s, pb_s, years_s],
+                        r=[div_s, pb_s, years_s, diversify_s, track_s],
                         theta=categories_radar,
                         fill='toself',
                         fillcolor='rgba(16, 185, 129, 0.2)',  # 綠色調 for ETF
-                        line_color='#10b981'
+                        line_color='#10b981',
+                        name='ETF 指標'
                     ))
                 else:
                     # 一般股票雷達圖
