@@ -644,6 +644,170 @@ def fetch_all_indicators(stock_id: str, token: str = None, price: float = None) 
     return result
 
 
+# ==============================================================================
+# 共用輔助函數 (Shared Helper Functions)
+# 用於減少 fetch_indicators_full 和其他函數的重複代碼
+# ==============================================================================
+
+def _parse_financial_statement_row(row: pd.Series, raw_data: dict, result: dict) -> tuple:
+    """解析財務報表單行資料
+    
+    Args:
+        row: DataFrame 的一行
+        raw_data: 原始數據字典 (會被修改)
+        result: 結果字典 (會被修改)
+        
+    Returns:
+        (current_eps, quarter): EPS 值和季度
+    """
+    item_type = str(row.get('type', '')).lower()
+    current_eps = None
+    quarter = None
+    
+    try:
+        val = float(row.get('value')) if row.get('value') is not None else None
+    except:
+        val = None
+    
+    if val is not None:
+        # EPS
+        if item_type == 'eps' or '基本每股盈餘' in item_type:
+            current_eps = val
+            result['eps'] = val
+        
+        # 淨利 (支援金融股和一般產業股)
+        elif 'incomeaftertax' in item_type and 'non' not in item_type:
+            raw_data['NetIncome'] = val
+        
+        # 權益
+        elif 'equityattributabletoownersofparent' in item_type or item_type == 'equity':
+            raw_data['Equity'] = val
+        
+        # 營收
+        elif item_type == 'revenue' or ('revenue' in item_type and 'non' not in item_type):
+            raw_data['Revenue'] = val
+        
+        # 毛利
+        elif 'grossprofit' in item_type:
+            raw_data['GrossProfit'] = val
+        
+        # 營業利益
+        elif 'operatingincome' in item_type:
+            raw_data['OperatingIncome'] = val
+        
+        # 總負債
+        elif 'totalliabilities' in item_type and 'non' not in item_type:
+            raw_data['TotalLiabilities'] = val
+        
+        # 總資產
+        elif 'totalassets' in item_type and 'non' not in item_type:
+            raw_data['TotalAssets'] = val
+    
+    return current_eps, quarter
+
+
+def _calculate_profit_margins(raw_data: dict, result: dict) -> None:
+    """計算利潤率指標
+    
+    Args:
+        raw_data: 包含 NetIncome, Revenue, GrossProfit, OperatingIncome 的字典
+        result: 結果字典 (會被修改)
+    """
+    revenue = raw_data.get('Revenue')
+    if revenue and revenue != 0:
+        if raw_data.get('NetIncome'):
+            result['net_profit_margin'] = round((raw_data['NetIncome'] / revenue) * 100, 2)
+        if raw_data.get('GrossProfit'):
+            result['gross_margin'] = round((raw_data['GrossProfit'] / revenue) * 100, 2)
+        if raw_data.get('OperatingIncome'):
+            result['operating_margin'] = round((raw_data['OperatingIncome'] / revenue) * 100, 2)
+
+
+def _calculate_roe_roa(raw_data: dict, result: dict, quarter: int = None) -> None:
+    """計算 ROE 和 ROA
+    
+    Args:
+        raw_data: 包含 NetIncome, Equity, TotalAssets 的字典
+        result: 結果字典 (會被修改)
+        quarter: 季度 (用於年化，None 則預設乘 4)
+    """
+    net_income = raw_data.get('NetIncome')
+    equity = raw_data.get('Equity')
+    total_assets = raw_data.get('TotalAssets')
+    
+    # 年化係數
+    annualize = 4 if quarter is None else (4 / quarter) if quarter < 4 else 1
+    
+    # ROE
+    if net_income and equity and equity != 0 and result.get('roe') is None:
+        roe = (net_income / equity) * 100 * annualize
+        if -100 <= roe <= 100:
+            result['roe'] = round(roe, 2)
+    
+    # ROA
+    if net_income and total_assets and total_assets != 0 and result.get('roa') is None:
+        roa = (net_income / total_assets) * 100 * annualize
+        if -50 <= roa <= 50:
+            result['roa'] = round(roa, 2)
+
+
+def _calculate_debt_ratio(raw_data: dict, result: dict) -> None:
+    """計算負債比率
+    
+    Args:
+        raw_data: 包含 TotalLiabilities, TotalAssets 的字典
+        result: 結果字典 (會被修改)
+    """
+    liabilities = raw_data.get('TotalLiabilities')
+    assets = raw_data.get('TotalAssets')
+    
+    if liabilities and assets and assets != 0 and result.get('debt_ratio') is None:
+        result['debt_ratio'] = round((liabilities / assets) * 100, 2)
+
+
+def _init_result_dict(stock_id: str) -> dict:
+    """初始化結果字典
+    
+    Args:
+        stock_id: 股票代號
+        
+    Returns:
+        包含所有指標欄位的字典
+    """
+    return {
+        'stock_id': stock_id,
+        'name': None,
+        'industry': None,
+        'roe': None,
+        'roa': None,
+        'eps': None,
+        'net_profit_margin': None,
+        'gross_margin': None,
+        'operating_margin': None,
+        'debt_ratio': None,
+        'pe': None,
+        'pb': None,
+        'dividend_yield': None,
+        'dividend_years': 0,
+        'revenue_growth': None,
+        'eps_growth': None,
+        'price': None,
+    }
+
+
+def _init_raw_data_dict() -> dict:
+    """初始化原始數據字典"""
+    return {
+        'NetIncome': None,
+        'Revenue': None,
+        'GrossProfit': None,
+        'OperatingIncome': None,
+        'Equity': None,
+        'TotalAssets': None,
+        'TotalLiabilities': None,
+    }
+
+
 def fetch_indicators_full(stock_id: str, token: str = None) -> Dict:
     """取得個股指標（完整版 - 6 次 API 請求，確保 11 項指標完整）
     
@@ -666,25 +830,8 @@ def fetch_indicators_full(stock_id: str, token: str = None) -> Dict:
     
     end_date = datetime.now().strftime("%Y-%m-%d")
     
-    result = {
-        'stock_id': stock_id,
-        'name': None,
-        'industry': None,
-        'roe': None,
-        'roa': None,
-        'eps': None,
-        'net_profit_margin': None,
-        'gross_margin': None,
-        'operating_margin': None,
-        'debt_ratio': None,
-        'pe': None,
-        'pb': None,
-        'dividend_yield': None,
-        'dividend_years': 0,
-        'revenue_growth': None,
-        'eps_growth': None,
-        'price': None,
-    }
+    # 使用共用初始化函數
+    result = _init_result_dict(stock_id)
     
     # 判斷是否為 ETF
     is_etf = str(stock_id).startswith('00')
