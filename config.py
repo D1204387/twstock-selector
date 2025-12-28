@@ -143,10 +143,14 @@ SCORING_WEIGHTS = {
     "debt_ratio": 0.15 # 15%
 }
 
-# ETF 專用評分權重
+# ETF 專用評分權重（動態邏輯）
+# 實際評分由 stock_analyzer.py 動態決定：
+# - PB 有值時：殖利率 70% + PB 30%
+# - PB 無值時：殖利率 80% + 配息年數 20%
 ETF_SCORING_WEIGHTS = {
-    "dividend_yield": 0.70,  # 70% (ETF 重視配息)
-    "pb": 0.30               # 30% (折溢價參考)
+    "dividend_yield": 0.70,  # 基礎權重
+    "pb": 0.30,              # PB 可用時使用
+    "dividend_years": 0.20   # PB 不可用時替代
 }
 
 # 策略定義
