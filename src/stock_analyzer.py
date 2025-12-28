@@ -62,22 +62,11 @@ def calculate_score(df: pd.DataFrame, weights: Dict = None) -> pd.DataFrame:
         is_etf = stock_id.startswith('00')
         
         if is_etf:
-            # ETF 動態評分邏輯
-            pb_value = row.get('pb', None)
-            has_valid_pb = pb_value is not None and not pd.isna(pb_value) and pb_value > 0
-            
-            if has_valid_pb:
-                # PB 有值：殖利率 70% + PB 30%
-                score = (
-                    row['dividend_score'] * 0.7 +
-                    row['pb_score'] * 0.3
-                )
-            else:
-                # PB 無值：殖利率 80% + 配息年數 20%
-                score = (
-                    row['dividend_score'] * 0.8 +
-                    row['dividend_years_score'] * 0.2
-                )
+            # ETF 評分邏輯：殖利率 80% + 配息年數 20%
+            score = (
+                row['dividend_score'] * 0.8 +
+                row['dividend_years_score'] * 0.2
+            )
         else:
             # 一般股票評分邏輯
             w = weights
@@ -294,25 +283,22 @@ def get_score_breakdown(stock_data: pd.Series, weights: Dict = None) -> Dict:
     is_etf = stock_id.startswith('00')
     
     if is_etf:
-        # ETF 評分明細
-        etf_weights = ETF_SCORING_WEIGHTS
-        
-        # 計算各項分數
+        # ETF 評分明細：殖利率 80% + 配息年數 20%
         div_score = score_dividend_yield(stock_data.get('dividend_yield', 0))
-        pb_score = score_pb(stock_data.get('pb', 0))
+        years_score = score_dividend_years(stock_data.get('dividend_years', 0))
         
         breakdown = {
             'dividend_yield': {
                 'value': stock_data.get('dividend_yield'),
                 'score': div_score,
-                'weight': etf_weights.get('dividend_yield', 0.7),
-                'weighted_score': div_score * etf_weights.get('dividend_yield', 0.7)
+                'weight': 0.8,
+                'weighted_score': div_score * 0.8
             },
-            'pb': {
-                'value': stock_data.get('pb'),
-                'score': pb_score,
-                'weight': etf_weights.get('pb', 0.3),
-                'weighted_score': pb_score * etf_weights.get('pb', 0.3)
+            'dividend_years': {
+                'value': stock_data.get('dividend_years'),
+                'score': years_score,
+                'weight': 0.2,
+                'weighted_score': years_score * 0.2
             }
         }
     else:
@@ -405,10 +391,11 @@ def analyze_stock(stock_data: Dict) -> Dict:
     dividend_score = score_dividend_yield(stock_data.get('dividend_yield', 0))
     
     if is_etf:
-        etf_weights = ETF_SCORING_WEIGHTS
+        # ETF 評分：殖利率 80% + 配息年數 20%
+        dividend_years_score = score_dividend_years(stock_data.get('dividend_years', 0))
         total_score = (
-            dividend_score * etf_weights.get('dividend_yield', 0.7) +
-            pb_score * etf_weights.get('pb', 0.3)
+            dividend_score * 0.8 +
+            dividend_years_score * 0.2
         )
     else:
         weights = SCORING_WEIGHTS
