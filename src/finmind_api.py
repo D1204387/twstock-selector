@@ -644,6 +644,257 @@ def fetch_all_indicators(stock_id: str, token: str = None, price: float = None) 
     return result
 
 
+def fetch_indicators_full(stock_id: str, token: str = None) -> Dict:
+    """取得個股指標（完整版 - 6 次 API 請求，確保 11 項指標完整）
+    
+    API 請求：
+    1. TaiwanStockPER - PE, PB, 殖利率, 股價
+    2. TaiwanStockDividend - 配息年數
+    3. TaiwanStockFinancialStatements (今年) - EPS, 淨利, 營收, 毛利, 營業利益
+    4. TaiwanStockFinancialStatements (去年) - 去年 EPS (計算成長率)
+    5. TaiwanStockBalanceSheet - 總資產, 負債, 權益 (計算 ROE, ROA, 負債率)
+    6. TaiwanStockMonthRevenue - 營收成長率
+    
+    Returns:
+        包含 11 項指標的字典
+    """
+    from dotenv import load_dotenv
+    import os
+    load_dotenv()
+    if not token:
+        token = os.getenv('FINMIND_TOKEN')
+    
+    end_date = datetime.now().strftime("%Y-%m-%d")
+    
+    result = {
+        'stock_id': stock_id,
+        'name': None,
+        'industry': None,
+        'roe': None,
+        'roa': None,
+        'eps': None,
+        'net_profit_margin': None,
+        'gross_margin': None,
+        'operating_margin': None,
+        'debt_ratio': None,
+        'pe': None,
+        'pb': None,
+        'dividend_yield': None,
+        'dividend_years': 0,
+        'revenue_growth': None,
+        'eps_growth': None,
+        'price': None,
+    }
+    
+    # 判斷是否為 ETF
+    is_etf = str(stock_id).startswith('00')
+    
+    # === 請求 1: PE/PB/殖利率 ===
+    df_per = get_finmind_data("TaiwanStockPER", stock_id, 
+                               (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d"),
+                               end_date, token)
+    if not df_per.empty:
+        latest = df_per.iloc[-1]
+        result['pe'] = latest.get('PER')
+        result['pb'] = latest.get('PBR')
+        result['dividend_yield'] = latest.get('dividend_yield')
+    
+    time.sleep(0.15)
+    
+    # === 請求 1.5: 股價 (從 TaiwanStockPrice) ===
+    df_price = get_finmind_data("TaiwanStockPrice", stock_id,
+                                 (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d"),
+                                 end_date, token)
+    if not df_price.empty:
+        latest_price = df_price.iloc[-1]
+        result['price'] = latest_price.get('close')
+    
+    time.sleep(0.15)
+    
+    # === 請求 2: 配息紀錄（計算連續配息年數）===
+    df_div = get_finmind_data("TaiwanStockDividend", stock_id, "2015-01-01", end_date, token)
+    if not df_div.empty:
+        # 計算連續配息年數
+        years_with_dividend = set()
+        for _, row in df_div.iterrows():
+            cash = row.get('CashEarningsDistribution', 0) or 0
+            stock = row.get('StockEarningsDistribution', 0) or 0
+            if cash > 0 or stock > 0:
+                year = row.get('year')
+                if year:
+                    try:
+                        # 處理民國年格式（如 '108年第3季' -> 2019）
+                        year_str = str(year)
+                        # 提取年份數字（只取「年」前的數字）
+                        import re
+                        match = re.match(r'(\d+)', year_str)
+                        if match:
+                            year_int = int(match.group(1))
+                            # 如果是民國年（小於 1900），轉換為西元年
+                            if year_int < 1900:
+                                year_int += 1911
+                            years_with_dividend.add(year_int)
+                    except (ValueError, TypeError):
+                        pass
+        
+        if years_with_dividend:
+            current_year = datetime.now().year
+            consecutive_years = 0
+            for y in range(current_year - 1, current_year - 20, -1):
+                if y in years_with_dividend:
+                    consecutive_years += 1
+                else:
+                    break
+            result['dividend_years'] = consecutive_years
+    
+    time.sleep(0.15)
+    
+    # ETF 不需要財務報表資料
+    if is_etf:
+        return result
+    
+    # === 請求 3: 今年財務報表 ===
+    start_date_fin = (datetime.now() - timedelta(days=400)).strftime("%Y-%m-%d")
+    df_fin = get_finmind_data("TaiwanStockFinancialStatements", stock_id, start_date_fin, end_date, token)
+    
+    raw_data = {
+        'NetIncome': None, 'Revenue': None, 
+        'GrossProfit': None, 'OperatingIncome': None
+    }
+    current_eps = None
+    
+    if not df_fin.empty:
+        # 取最新一季
+        latest_date = df_fin['date'].max()
+        latest = df_fin[df_fin['date'] == latest_date]
+        
+        for _, row in latest.iterrows():
+            item_type = str(row.get('type', '')).lower()
+            try:
+                val = float(row.get('value')) if row.get('value') is not None else None
+            except:
+                val = None
+            
+            if val is not None:
+                if item_type == 'eps':
+                    current_eps = val
+                    result['eps'] = val
+                # 支援金融股 (IncomeAfterTax) 和一般產業股 (IncomeAfterTaxes)
+                elif ('incomeaftertax' in item_type) and 'non' not in item_type:
+                    raw_data['NetIncome'] = val
+                elif item_type == 'revenue':
+                    raw_data['Revenue'] = val
+                elif item_type == 'grossprofit':
+                    raw_data['GrossProfit'] = val
+                elif item_type == 'operatingincome':
+                    raw_data['OperatingIncome'] = val
+        
+        # 計算利潤率指標
+        if raw_data['Revenue'] and raw_data['Revenue'] != 0:
+            if raw_data['NetIncome']:
+                result['net_profit_margin'] = round((raw_data['NetIncome'] / raw_data['Revenue']) * 100, 2)
+            if raw_data['GrossProfit']:
+                result['gross_margin'] = round((raw_data['GrossProfit'] / raw_data['Revenue']) * 100, 2)
+            if raw_data['OperatingIncome']:
+                result['operating_margin'] = round((raw_data['OperatingIncome'] / raw_data['Revenue']) * 100, 2)
+    
+    time.sleep(0.15)
+    
+    # === 請求 4: 去年財務報表（計算 EPS 成長率）===
+    last_year = datetime.now().year - 1
+    start_date_ly = f"{last_year - 1}-01-01"
+    end_date_ly = f"{last_year}-12-31"
+    
+    df_fin_ly = get_finmind_data("TaiwanStockFinancialStatements", stock_id, start_date_ly, end_date_ly, token)
+    
+    if not df_fin_ly.empty and current_eps is not None:
+        # 找去年同季的 EPS
+        latest_date_ly = df_fin_ly['date'].max()
+        latest_ly = df_fin_ly[df_fin_ly['date'] == latest_date_ly]
+        
+        for _, row in latest_ly.iterrows():
+            if str(row.get('type', '')).lower() == 'eps':
+                try:
+                    last_eps = float(row.get('value'))
+                    if last_eps and abs(last_eps) > 0.01:
+                        result['eps_growth'] = round(((current_eps - last_eps) / abs(last_eps)) * 100, 2)
+                except:
+                    pass
+                break
+    
+    time.sleep(0.15)
+    
+    # === 請求 5: 資產負債表（ROE, ROA, 負債率）===
+    df_bs = get_finmind_data("TaiwanStockBalanceSheet", stock_id, start_date_fin, end_date, token)
+    
+    total_assets = None
+    total_liabilities = None
+    equity = None
+    
+    if not df_bs.empty:
+        latest_date = df_bs['date'].max()
+        latest = df_bs[df_bs['date'] == latest_date]
+        
+        for _, row in latest.iterrows():
+            item_type = str(row.get('type', '')).lower()
+            try:
+                val = float(row.get('value')) if row.get('value') is not None else None
+            except:
+                val = None
+            
+            if val is not None:
+                if item_type == 'totalassets':
+                    total_assets = val
+                elif item_type == 'liabilities':
+                    total_liabilities = val
+                elif 'equityattributabletoownersofparent' in item_type or item_type == 'equity':
+                    equity = val
+        
+        # 計算 ROE, ROA, 負債率
+        if raw_data['NetIncome']:
+            if equity and equity != 0:
+                roe = (raw_data['NetIncome'] / equity) * 100 * 4  # 年化
+                if -100 <= roe <= 100:
+                    result['roe'] = round(roe, 2)
+            
+            if total_assets and total_assets != 0:
+                roa = (raw_data['NetIncome'] / total_assets) * 100 * 4  # 年化
+                if -50 <= roa <= 50:
+                    result['roa'] = round(roa, 2)
+        
+        if total_liabilities and total_assets and total_assets != 0:
+            result['debt_ratio'] = round((total_liabilities / total_assets) * 100, 2)
+    
+    time.sleep(0.15)
+    
+    # === 請求 6: 月營收（計算營收成長率 YoY）===
+    df_rev = get_finmind_data("TaiwanStockMonthRevenue", stock_id, 
+                               (datetime.now() - timedelta(days=60)).strftime("%Y-%m-%d"),
+                               end_date, token)
+    
+    if not df_rev.empty:
+        # 取最新月份的營收
+        latest = df_rev.iloc[-1]
+        current_rev = latest.get('revenue')
+        
+        # 取去年同月營收
+        if current_rev:
+            rev_year = latest.get('revenue_year')
+            rev_month = latest.get('revenue_month')
+            
+            # 找去年同月
+            last_year_data = df_rev[
+                (df_rev['revenue_year'] == rev_year - 1) & 
+                (df_rev['revenue_month'] == rev_month)
+            ]
+            if not last_year_data.empty:
+                last_year_rev = last_year_data.iloc[0].get('revenue')
+                if last_year_rev and last_year_rev > 0:
+                    result['revenue_growth'] = round(((current_rev - last_year_rev) / last_year_rev) * 100, 2)
+    
+    return result
+
+
 def fetch_indicators_lite(stock_id: str, token: str = None) -> Dict:
     """取得個股指標（輕量版 - 只需 3 次 API 請求）
     

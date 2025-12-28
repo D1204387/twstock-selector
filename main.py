@@ -102,7 +102,7 @@ def main():
             <div class="label">熱門 ETF</div>
         </div>
         <div class="stat-card">
-            <div class="number">15</div>
+            <div class="number">11</div>
             <div class="label">財務指標</div>
         </div>
     </div>

@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from src.finmind_api import (
-    fetch_indicators_lite, 
+    fetch_indicators_full,  # 使用完整版（6 次 API 請求）
     get_core_stocks_list, 
     CACHE_DIR
 )
@@ -124,7 +124,7 @@ def main():
             # 所以這裡我們手動計算時間
             
             try:
-                stock_data = fetch_indicators_lite(stock_id, token)
+                stock_data = fetch_indicators_full(stock_id, token)  # 完整版
             except BlockingIOError:
                 print("\n⛔️ API 額度已達上限 (402)，程式自動暫停。")
                 print("💡 請等待約 1 小時後再重新執行，進度已自動儲存。")
