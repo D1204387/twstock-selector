@@ -156,6 +156,12 @@ if keyword:
                 </div>
                 """, unsafe_allow_html=True)
             
+            # 虧損警示
+            eps_val = stock.get('eps')
+            roe_val = stock.get('roe')
+            if (pd.notna(eps_val) and eps_val < 0) or (pd.notna(roe_val) and roe_val < 0):
+                st.warning("⚠️ **虧損警示**：該公司 EPS 或 ROE 為負值，請審慎評估投資風險。")
+            
             st.divider()
             
             # 財務指標
@@ -197,7 +203,11 @@ if keyword:
                                 st.markdown(f"**{info.get('name', key)}**", help=help_text)
                             with c2:
                                 if pd.notna(value):
-                                    st.markdown(f"{value:.2f}{info.get('unit', '')}")
+                                    # 虧損標示：負值顯示紅色
+                                    if value < 0:
+                                        st.markdown(f"🔴 <span style='color: red;'>{value:.2f}{info.get('unit', '')}</span>", unsafe_allow_html=True)
+                                    else:
+                                        st.markdown(f"{value:.2f}{info.get('unit', '')}")
                                 else:
                                     st.markdown("N/A")
             
