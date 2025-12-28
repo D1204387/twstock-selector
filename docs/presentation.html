@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台股智選系統 - 期末報告</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/reveal.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/theme/night.css">
+    <style>
+        :root {
+            --r-background-color: #1a1a2e;
+            --r-main-color: #eaeaea;
+            --r-heading-color: #00d4ff;
+            --r-link-color: #00d4ff;
+        }
+
+        .reveal h1,
+        .reveal h2,
+        .reveal h3 {
+            text-transform: none;
+            font-weight: 700;
+        }
+
+        .reveal h1 {
+            font-size: 2.5em;
+        }
+
+        .reveal h2 {
+            font-size: 1.8em;
+            color: #00d4ff;
+        }
+
+        .reveal h3 {
+            font-size: 1.4em;
+            color: #ffd700;
+        }
+
+        .reveal table {
+            margin: 0 auto;
+            border-collapse: collapse;
+            font-size: 0.8em;
+        }
+
+        .reveal table th {
+            background: #00d4ff;
+            color: #1a1a2e;
+            padding: 12px 20px;
+        }
+
+        .reveal table td {
+            padding: 10px 20px;
+            border-bottom: 1px solid #333;
+        }
+
+        .reveal .highlight {
+            color: #00d4ff;
+            font-weight: bold;
+        }
+
+        .reveal ul {
+            list-style: none;
+        }
+
+        .reveal ul li::before {
+            content: "▸ ";
+            color: #00d4ff;
+        }
+
+        .reveal .big-number {
+            font-size: 4em;
+            color: #00d4ff;
+            font-weight: bold;
+        }
+
+        .reveal .subtitle {
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .reveal .tech-stack {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        .reveal .tech-item {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid #00d4ff;
+            border-radius: 10px;
+            padding: 20px 30px;
+            text-align: center;
+        }
+
+        .reveal .tech-item h4 {
+            color: #00d4ff;
+            margin: 0 0 10px 0;
+        }
+
+        .reveal .code-block {
+            background: #0d0d1a;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: left;
+            font-family: 'Courier New', monospace;
+            font-size: 0.7em;
+        }
+
+        .reveal .two-column {
+            display: flex;
+            gap: 40px;
+        }
+
+        .reveal .two-column>div {
+            flex: 1;
+        }
+
+        .reveal .screenshot {
+            max-width: 85%;
+            max-height: 500px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .reveal .screenshot-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .reveal .screenshot-grid img {
+            width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="reveal">
+        <div class="slides">
+
+            <!-- Slide 1: Title -->
+            <section>
+                <h1>📈 台股智選系統</h1>
+                <p class="subtitle">Python 期末專案報告</p>
+                <p style="margin-top: 40px; font-size: 1.2em;">M1427499 陳憶柔</p>
+                <p style="margin-top: 30px; color: #888;">2025/12</p>
+            </section>
+
+            <!-- Slide 2: Problem -->
+            <section>
+                <h2>🎯 解決什麼問題？</h2>
+                <div style="margin-top: 40px;">
+                    <p class="big-number">2,000+</p>
+                    <p>台灣上市櫃股票與 ETF</p>
+                </div>
+                <p style="margin-top: 40px;">
+                    投資人面臨 <span class="highlight">資訊過載</span>，
+                    難以快速找到值得投資的標的
+                </p>
+            </section>
+
+            <!-- Slide 3: Solution -->
+            <section>
+                <h2>💡 我們的解決方案</h2>
+                <ul style="margin-top: 40px; font-size: 1.1em;">
+                    <li>🔍 智慧搜尋與篩選</li>
+                    <li>📊 11 項財務指標分析</li>
+                    <li>🏆 0-10 分綜合評分</li>
+                    <li>🤖 AI 自然語言選股</li>
+                </ul>
+            </section>
+
+            <!-- Slide 4: Data Coverage -->
+            <section>
+                <h2>📈 資料涵蓋</h2>
+                <p class="big-number">120 檔</p>
+                <p>精選核心標的（涵蓋台股 85% 市值）</p>
+                <table style="margin-top: 30px;">
+                    <tr>
+                        <td>台灣 50 成分股</td>
+                        <td>50 檔</td>
+                    </tr>
+                    <tr>
+                        <td>中型 100 精選</td>
+                        <td>50 檔</td>
+                    </tr>
+                    <tr>
+                        <td>熱門 ETF</td>
+                        <td>10 檔</td>
+                    </tr>
+                    <tr>
+                        <td>補充熱門股</td>
+                        <td>10 檔</td>
+                    </tr>
+                </table>
+            </section>
+
+            <!-- Slide 5: Architecture -->
+            <section>
+                <h2>🏗️ 系統架構</h2>
+                <div class="code-block" style="margin-top: 30px;">
+                    <pre style="margin: 0; color: #eee;">
+┌─────────────────────────────────────────────┐
+│           Streamlit Web App                 │
+├─────────────────────────────────────────────┤
+│  🔍 搜尋  │  📊 篩選  │  🏆 排名  │  🤖 AI  │
+├─────────────────────────────────────────────┤
+│     stock_analyzer / stock_screener         │
+├─────────────────────────────────────────────┤
+│              FinMind API                    │
+│         ↓ Offline-First ↓                   │
+│      robust_indicators_data.csv             │
+└─────────────────────────────────────────────┘</pre>
+                </div>
+            </section>
+
+            <!-- Slide 6: Scoring System -->
+            <section>
+                <h2>🔧 評分系統</h2>
+                <div class="two-column" style="margin-top: 30px;">
+                    <div>
+                        <h3>一般個股</h3>
+                        <table>
+                            <tr>
+                                <th>指標</th>
+                                <th>權重</th>
+                            </tr>
+                            <tr>
+                                <td>ROE</td>
+                                <td>40%</td>
+                            </tr>
+                            <tr>
+                                <td>PE</td>
+                                <td>30%</td>
+                            </tr>
+                            <tr>
+                                <td>PB</td>
+                                <td>15%</td>
+                            </tr>
+                            <tr>
+                                <td>負債率</td>
+                                <td>15%</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div>
+                        <h3>ETF</h3>
+                        <table>
+                            <tr>
+                                <th>指標</th>
+                                <th>權重</th>
+                            </tr>
+                            <tr>
+                                <td>殖利率</td>
+                                <td>80%</td>
+                            </tr>
+                            <tr>
+                                <td>配息年數</td>
+                                <td>20%</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 7: Built-in Strategies -->
+            <section>
+                <h2>📊 四大內建策略</h2>
+                <table style="margin-top: 30px;">
+                    <tr>
+                        <th>策略</th>
+                        <th>核心條件</th>
+                    </tr>
+                    <tr>
+                        <td>🚀 成長股</td>
+                        <td>高 ROE、高淨利率</td>
+                    </tr>
+                    <tr>
+                        <td>💎 價值股</td>
+                        <td>低 PE、低 PB</td>
+                    </tr>
+                    <tr>
+                        <td>💰 高股息</td>
+                        <td>高殖利率、穩定配息</td>
+                    </tr>
+                    <tr>
+                        <td>⭐ 優質股</td>
+                        <td>財務穩健、低負債</td>
+                    </tr>
+                </table>
+            </section>
+
+            <!-- Slide 8: Tech Stack -->
+            <section>
+                <h2>🛠️ 技術應用</h2>
+                <div class="tech-stack" style="margin-top: 40px;">
+                    <div class="tech-item">
+                        <h4>Pandas</h4>
+                        <p>資料處理</p>
+                    </div>
+                    <div class="tech-item">
+                        <h4>Streamlit</h4>
+                        <p>Web UI</p>
+                    </div>
+                    <div class="tech-item">
+                        <h4>Requests</h4>
+                        <p>API 串接</p>
+                    </div>
+                    <div class="tech-item">
+                        <h4>Plotly</h4>
+                        <p>資料視覺化</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 9: Screenshot - Home -->
+            <section>
+                <h2>🖥️ 系統展示 - 首頁</h2>
+                <img src="screenshot_home.png" class="screenshot" alt="首頁">
+            </section>
+
+            <!-- Slide 10: Screenshot - Search -->
+            <section>
+                <h2>🔍 搜尋功能</h2>
+                <img src="screenshot_search.png" class="screenshot" alt="搜尋頁面">
+            </section>
+
+            <!-- Slide 11: Screenshot - Filter -->
+            <section>
+                <h2>🎛️ 策略篩選</h2>
+                <img src="screenshot_filter.png" class="screenshot" alt="篩選頁面">
+            </section>
+
+            <!-- Slide 12: Screenshot - Ranking -->
+            <section>
+                <h2>🏆 排名分析</h2>
+                <img src="screenshot_ranking.png" class="screenshot" alt="排名頁面">
+            </section>
+
+            <!-- Slide 13: Screenshot - AI -->
+            <section>
+                <h2>🤖 AI 智慧選股</h2>
+                <img src="screenshot_ai.png" class="screenshot" alt="AI選股頁面">
+            </section>
+
+            <!-- Slide 14: Conclusion -->
+            <section>
+                <h2>📝 結語</h2>
+                <blockquote
+                    style="margin-top: 40px; border-left: 4px solid #00d4ff; padding-left: 20px; font-style: italic;">
+                    「專注於分析公司的財務體質，<br>
+                    幫助投資人找到值得長期持有的好公司。」
+                </blockquote>
+                <p style="margin-top: 60px; font-size: 1.5em;">
+                    🙏 謝謝聆聽
+                </p>
+            </section>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/reveal.js"></script>
+    <script>
+        Reveal.initialize({
+            hash: true,
+            slideNumber: true,
+            transition: 'slide',
+            center: true,
+            width: 1280,
+            height: 720
+        });
+    </script>
+</body>
+
+</html>
