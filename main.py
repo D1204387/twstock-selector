@@ -97,15 +97,15 @@ def main():
     <div class="stat-row">
         <div class="stat-card highlight">
             <div class="number">120</div>
-            <div class="label">精選股票（~85%市值）</div>
+            <div class="label">精選標的（~85%市值）</div>
         </div>
         <div class="stat-card">
-            <div class="number">50+100</div>
-            <div class="label">台灣50+中型100</div>
+            <div class="number">50+50</div>
+            <div class="label">台灣50+中型精選50</div>
         </div>
         <div class="stat-card">
-            <div class="number">10</div>
-            <div class="label">熱門 ETF</div>
+            <div class="number">10+10</div>
+            <div class="label">ETF+熱門股</div>
         </div>
         <div class="stat-card">
             <div class="number">11</div>
@@ -152,7 +152,7 @@ def main():
         st.markdown(f"""
         <div class="feature-card">
             <h4>📊 涵蓋範圍</h4>
-            <p>{stock_count} 檔（台灣50+中型100+ETF10）</p>
+            <p>{stock_count} 檔（台灣50+中型精選50+ETF10+熱門股10）</p>
         </div>
         """, unsafe_allow_html=True)
         

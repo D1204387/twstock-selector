@@ -13,7 +13,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.data_fetcher import get_stock_list, generate_sample_data, load_robust_data
-from src.stock_analyzer import analyze_stock, get_score_grade, is_roe_abnormal
+from src.stock_analyzer import analyze_stock, get_score_grade, is_roe_abnormal, get_score_breakdown, generate_score_explanation
 from src.indicators import get_indicators_by_category
 from src.styles import GLARITY_STYLE
 from config import INDICATORS
@@ -231,75 +231,164 @@ if keyword:
                                     st.markdown("N/A")
             
             with col2:
-                st.subheader("指標雷達圖")
+                st.subheader("📊 指標評分儀表板")
                 
                 # 判斷是否為 ETF
                 is_etf = str(stock.get('stock_id', '')).startswith('00')
                 
-                if is_etf:
-                    # ETF 專用雷達圖：5 個維度
-                    categories_radar = ['殖利率', '折溢價(PB)', '配息穩定度', '分散風險', '追蹤效率']
-                    
-                    # 殖利率（7%+ = 滿分）
-                    div_yield = stock.get('dividend_yield', 0) or 0
-                    div_s = min(10, max(0, div_yield * 1.2))  # 8% = 9.6分
-                    
-                    # PB（折溢價，ETF PB < 1 代表折價買入）
-                    pb = stock.get('pb', 1) or 1
-                    if pb <= 1:
-                        pb_s = 10  # 折價 = 滿分
-                    elif pb <= 1.05:
-                        pb_s = 8   # 小幅溢價
-                    elif pb <= 1.1:
-                        pb_s = 6   # 中度溢價
+                # 進度條樣式
+                def render_progress_bar(label, value, score, weight=None, unit=""):
+                    """渲染單一指標的進度條"""
+                    # 根據分數決定顏色
+                    if score >= 8:
+                        color = "#22c55e"  # 綠色
+                    elif score >= 6:
+                        color = "#3b82f6"  # 藍色
+                    elif score >= 4:
+                        color = "#f59e0b"  # 橙色
                     else:
-                        pb_s = max(0, 10 - (pb - 1) * 20)  # 溢價越高分數越低
+                        color = "#ef4444"  # 紅色
                     
-                    # 配息穩定度（連續配息年數，5年+ = 滿分）
-                    years = stock.get('dividend_years', 0) or 0
-                    years_s = min(10, years * 2)  # 5年 = 10分
+                    percentage = min(100, score * 10)
+                    weight_text = f" ({weight})" if weight else ""
                     
-                    # 分散風險（ETF 固有優勢，給予高分）
-                    diversify_s = 9  # ETF 天生分散風險
-                    
-                    # 追蹤效率（假設良好，根據殖利率間接評估）
-                    track_s = min(10, 7 + div_yield * 0.3) if div_yield > 3 else 6
-                    
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatterpolar(
-                        r=[div_s, pb_s, years_s, diversify_s, track_s],
-                        theta=categories_radar,
-                        fill='toself',
-                        fillcolor='rgba(16, 185, 129, 0.2)',  # 綠色調 for ETF
-                        line_color='#10b981',
-                        name='ETF 指標'
-                    ))
-                else:
-                    # 一般股票雷達圖
-                    categories_radar = ['權益報酬率', '本益比', '淨值比', '負債率', '殖利率']
-                    roe_s = min(10, max(0, (stock.get('roe', 0) or 0) / 3))
-                    pe = stock.get('pe', 15) or 15
-                    pe_s = 10 - min(10, max(0, abs(pe - 15) / 3))
-                    pb = stock.get('pb', 2) or 2
-                    pb_s = min(10, max(0, (3 - pb) * 3))
-                    debt_s = min(10, max(0, (100 - (stock.get('debt_ratio', 50) or 50)) / 10))
-                    div_s = min(10, max(0, (stock.get('dividend_yield', 0) or 0) * 2))
-                    
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatterpolar(
-                        r=[roe_s, pe_s, pb_s, debt_s, div_s],
-                        theta=categories_radar,
-                        fill='toself',
-                        fillcolor='rgba(37, 99, 235, 0.2)',
-                        line_color='#2563eb'
-                    ))
+                    st.markdown(f"""
+                    <div style="margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                            <span style="font-weight: 500; color: #374151;">{label}{weight_text}</span>
+                            <span style="color: #6b7280;">{value}{unit} → <strong style="color: {color};">{score:.1f} 分</strong></span>
+                        </div>
+                        <div style="background: #e5e7eb; border-radius: 4px; height: 12px; overflow: hidden;">
+                            <div style="background: {color}; width: {percentage}%; height: 100%; border-radius: 4px; transition: width 0.3s;"></div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
                 
-                fig.update_layout(
-                    polar=dict(radialaxis=dict(visible=True, range=[0, 10], gridcolor='#e5e7eb')),
-                    showlegend=False, height=300, margin=dict(l=40, r=40, t=20, b=20),
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                if is_etf:
+                    # ETF 評分儀表板
+                    from src.stock_analyzer import score_dividend_yield, score_dividend_years
+                    
+                    div_yield = stock.get('dividend_yield', 0) or 0
+                    div_s = score_dividend_yield(div_yield)
+                    
+                    years = stock.get('dividend_years', 0) or 0
+                    years_s = score_dividend_years(years)
+                    
+                    total_score = div_s * 0.8 + years_s * 0.2
+                    
+                    render_progress_bar("殖利率", f"{div_yield:.2f}", div_s, "80%", "%")
+                    render_progress_bar("配息年數", f"{int(years)}", years_s, "20%", " 年")
+                    
+                    # 總分區塊
+                    grade = get_score_grade(total_score)
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 1rem; border-radius: 8px; margin-top: 0.5rem; text-align: center;">
+                        <span style="font-size: 0.85rem;">ETF 評分合計</span><br>
+                        <span style="font-size: 1.8rem; font-weight: bold;">{total_score:.2f}</span>
+                        <span style="font-size: 0.9rem;"> / 10 分</span>
+                        <span style="background: rgba(255,255,255,0.2); padding: 0.2rem 0.6rem; border-radius: 4px; margin-left: 0.5rem; font-weight: bold;">{grade} 級</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                else:
+                    # 一般股票評分儀表板
+                    from src.stock_analyzer import score_roe, score_pe, score_pb, score_debt_ratio
+                    
+                    roe_val = stock.get('roe', 0) or 0
+                    roe_s = score_roe(roe_val)
+                    
+                    pe_val = stock.get('pe', 0) or 0
+                    pe_s = score_pe(pe_val)
+                    
+                    pb_val = stock.get('pb', 0) or 0
+                    pb_s = score_pb(pb_val)
+                    
+                    debt_val = stock.get('debt_ratio', 0) or 0
+                    debt_s = score_debt_ratio(debt_val)
+                    
+                    total_score = roe_s * 0.4 + pe_s * 0.3 + pb_s * 0.15 + debt_s * 0.15
+                    
+                    render_progress_bar("權益報酬率", f"{roe_val:.2f}", roe_s, "40%", "%")
+                    render_progress_bar("本益比", f"{pe_val:.2f}", pe_s, "30%", " 倍")
+                    render_progress_bar("淨值比", f"{pb_val:.2f}", pb_s, "15%", " 倍")
+                    render_progress_bar("負債率", f"{debt_val:.2f}", debt_s, "15%", "%")
+                    
+                    # 總分區塊
+                    grade = get_score_grade(total_score)
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 1rem; border-radius: 8px; margin-top: 0.5rem; text-align: center;">
+                        <span style="font-size: 0.85rem;">綜合評分</span><br>
+                        <span style="font-size: 1.8rem; font-weight: bold;">{total_score:.2f}</span>
+                        <span style="font-size: 0.9rem;"> / 10 分</span>
+                        <span style="background: rgba(255,255,255,0.2); padding: 0.2rem 0.6rem; border-radius: 4px; margin-left: 0.5rem; font-weight: bold;">{grade} 級</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # 📊 評分明細區塊
+                st.subheader("📊 評分明細")
+                
+                # 取得評分明細
+                score_breakdown = get_score_breakdown(stock)
+                is_etf_stock = str(stock.get('stock_id', '')).startswith('00')
+                
+                if is_etf_stock:
+                    # ETF 評分明細表格
+                    breakdown_data = [
+                        {
+                            "指標": "殖利率",
+                            "數值": f"{stock.get('dividend_yield', 0):.1f}%",
+                            "分數": f"{score_breakdown['dividend_yield']['score']:.1f}",
+                            "權重": "80%",
+                            "貢獻": f"{score_breakdown['dividend_yield']['weighted_score']:.1f}"
+                        },
+                        {
+                            "指標": "配息年數",
+                            "數值": f"{int(stock.get('dividend_years', 0) or 0)} 年",
+                            "分數": f"{score_breakdown['dividend_years']['score']:.1f}",
+                            "權重": "20%",
+                            "貢獻": f"{score_breakdown['dividend_years']['weighted_score']:.1f}"
+                        }
+                    ]
+                else:
+                    # 一般個股評分明細表格
+                    breakdown_data = [
+                        {
+                            "指標": "權益報酬率 (ROE)",
+                            "數值": f"{stock.get('roe', 0):.1f}%",
+                            "分數": f"{score_breakdown['roe']['score']:.1f}",
+                            "權重": "40%",
+                            "貢獻": f"{score_breakdown['roe']['weighted_score']:.1f}"
+                        },
+                        {
+                            "指標": "本益比 (PE)",
+                            "數值": f"{stock.get('pe', 0):.1f}",
+                            "分數": f"{score_breakdown['pe']['score']:.1f}",
+                            "權重": "30%",
+                            "貢獻": f"{score_breakdown['pe']['weighted_score']:.1f}"
+                        },
+                        {
+                            "指標": "淨值比 (PB)",
+                            "數值": f"{stock.get('pb', 0):.1f}",
+                            "分數": f"{score_breakdown['pb']['score']:.1f}",
+                            "權重": "15%",
+                            "貢獻": f"{score_breakdown['pb']['weighted_score']:.1f}"
+                        },
+                        {
+                            "指標": "負債率",
+                            "數值": f"{stock.get('debt_ratio', 0):.1f}%",
+                            "分數": f"{score_breakdown['debt_ratio']['score']:.1f}",
+                            "權重": "15%",
+                            "貢獻": f"{score_breakdown['debt_ratio']['weighted_score']:.1f}"
+                        }
+                    ]
+                
+                # 顯示表格
+                breakdown_df = pd.DataFrame(breakdown_data)
+                st.dataframe(breakdown_df, use_container_width=True, hide_index=True)
+                
+                # 口語化說明
+                explanation = generate_score_explanation(stock.to_dict(), analysis)
+                st.info(f"💬 **總評**：{explanation}")
                 
                 # 優缺點
                 st.subheader("投資分析")
@@ -338,7 +427,7 @@ else:
         
         **詳細資訊**
         - 查看股票的財務指標
-        - 雷達圖顯示各項評分
+        - 進度條儀表板顯示各項評分
         - 優缺點分析
         
         **快速連結**

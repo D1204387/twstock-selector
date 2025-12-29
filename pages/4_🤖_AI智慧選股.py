@@ -122,31 +122,29 @@ def load_data():
 df = load_data()
 
 # AI 輸入區
-st.markdown('<div class="ai-input-card">', unsafe_allow_html=True)
-st.markdown("### 💬 請描述您想找的股票")
-
-# 查詢輸入
-query = st.text_input(
-    "輸入查詢",
-    placeholder="例如：每年配息超過5%的股票、最具成長性的科技股...",
-    label_visibility="collapsed"
-)
-
-# 範例查詢
-st.markdown("**💡 試試這些查詢：**")
-example_cols = st.columns(4)
-for i, example in enumerate(EXAMPLE_QUERIES[:8]):
-    with example_cols[i % 4]:
-        if st.button(example, key=f"example_{i}", use_container_width=True):
-            query = example
-            st.session_state["current_query"] = example
-            st.rerun()
-
-# 檢查 session_state 中的查詢
-if "current_query" in st.session_state and not query:
-    query = st.session_state["current_query"]
-
-st.markdown('</div>', unsafe_allow_html=True)
+with st.container():
+    st.markdown("### 💬 請描述您想找的股票")
+    
+    # 查詢輸入
+    query = st.text_input(
+        "輸入查詢",
+        placeholder="例如：每年配息超過5%的股票、最具成長性的科技股...",
+        label_visibility="collapsed"
+    )
+    
+    # 範例查詢
+    st.markdown("**💡 試試這些查詢：**")
+    example_cols = st.columns(4)
+    for i, example in enumerate(EXAMPLE_QUERIES[:8]):
+        with example_cols[i % 4]:
+            if st.button(example, key=f"example_{i}", use_container_width=True):
+                query = example
+                st.session_state["current_query"] = example
+                st.rerun()
+    
+    # 檢查 session_state 中的查詢
+    if "current_query" in st.session_state and not query:
+        query = st.session_state["current_query"]
 
 # 執行查詢
 if query:
@@ -291,6 +289,165 @@ if query:
                 mime="text/csv",
                 key="download_csv"
             )
+            
+            st.divider()
+            
+            # ========== 個股評分明細 ==========
+            st.subheader("🔍 查看個股評分明細")
+            
+            from src.stock_analyzer import score_roe, score_pe, score_pb, score_debt_ratio, score_dividend_yield, score_dividend_years, get_score_grade, generate_score_explanation
+            
+            with st.expander("展開查看個股詳細評分", expanded=False):
+                ai_stock_options = [f"{row['stock_id']} - {row['name']}" for _, row in filtered_df.iterrows()]
+                if ai_stock_options:
+                    ai_selected_option = st.selectbox("選擇股票", ai_stock_options, key="ai_stock_select")
+                    ai_selected_id = ai_selected_option.split(" - ")[0]
+                    ai_stock = filtered_df[filtered_df['stock_id'] == ai_selected_id].iloc[0]
+                    
+                    # 判斷是否為 ETF
+                    is_etf = str(ai_stock.get('stock_id', '')).startswith('00')
+                    
+                    if is_etf:
+                        # ETF 評分明細
+                        c1, c2 = st.columns(2)
+                        
+                        div_yield_val = ai_stock.get('dividend_yield', 0) or 0
+                        div_yield_score = score_dividend_yield(div_yield_val)
+                        div_yield_contrib = div_yield_score * 0.8
+                        
+                        div_years_val = ai_stock.get('dividend_years', 0) or 0
+                        div_years_score = score_dividend_years(div_years_val)
+                        div_years_contrib = div_years_score * 0.2
+                        
+                        total_score = div_yield_contrib + div_years_contrib
+                        grade = get_score_grade(total_score)
+                        
+                        with c1:
+                            st.metric("殖利率 (80%)", f"{div_yield_val:.2f}%")
+                            st.caption(f"得分: {div_yield_score:.1f} (貢獻 {div_yield_contrib:.1f} 分)")
+                        
+                        with c2:
+                            st.metric("配息年數 (20%)", f"{int(div_years_val)} 年")
+                            st.caption(f"得分: {div_years_score:.1f} (貢獻 {div_years_contrib:.1f} 分)")
+                        
+                        # 評分合計
+                        st.markdown(f"""
+                        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 1rem; border-radius: 8px; margin-top: 1rem; text-align: center;">
+                            <span style="font-size: 0.9rem;">評分合計</span><br>
+                            <span style="font-size: 2rem; font-weight: bold;">{total_score:.2f}</span>
+                            <span style="font-size: 1rem;"> / 10 分</span>
+                            <span style="background: rgba(255,255,255,0.2); padding: 0.25rem 0.75rem; border-radius: 6px; margin-left: 0.5rem; font-size: 1.2rem; font-weight: bold;">{grade} 級</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # ETF 評分說明
+                        st.markdown("""
+                        <div style="background-color: #f8fafc; padding: 1rem; border-radius: 8px; margin-top: 1rem; border-left: 4px solid #10b981;">
+                            <h4 style="margin: 0 0 0.5rem 0; font-size: 1rem; color: #059669;">📊 ETF 評分指標說明</h4>
+                            <div style="display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.9rem; color: #4b5563;">
+                                <div><strong>殖利率 (80%)</strong><br>配息收益能力</div>
+                                <div><strong>配息年數 (20%)</strong><br>配息穩定度</div>
+                            </div>
+                            <hr style="margin: 0.75rem 0; border: none; border-top: 1px solid #e2e8f0;">
+                            <div style="font-size: 0.85rem; color: #6b7280;">
+                                <strong>📌 滿分 10 分標準：</strong>
+                                殖利率 ≥ 6% ｜ 配息年數 ≥ 10 年
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # 總評
+                        analysis = {
+                            'score': total_score,
+                            'grade': grade,
+                            'breakdown': {
+                                'dividend_yield_score': div_yield_score,
+                                'dividend_years_score': div_years_score
+                            }
+                        }
+                        explanation = generate_score_explanation(ai_stock.to_dict(), analysis)
+                        st.info(f"💬 **總評**：{explanation}")
+                        
+                    else:
+                        # 一般個股評分明細
+                        c1, c2, c3, c4 = st.columns(4)
+                        
+                        roe_val = ai_stock.get('roe', 0) or 0
+                        roe_score = score_roe(roe_val)
+                        roe_contrib = roe_score * 0.4
+                        
+                        pe_val = ai_stock.get('pe', 0) or 0
+                        pe_score = score_pe(pe_val)
+                        pe_contrib = pe_score * 0.3
+                        
+                        pb_val = ai_stock.get('pb', 0) or 0
+                        pb_score = score_pb(pb_val)
+                        pb_contrib = pb_score * 0.15
+                        
+                        debt_val = ai_stock.get('debt_ratio', 0) or 0
+                        debt_score = score_debt_ratio(debt_val)
+                        debt_contrib = debt_score * 0.15
+                        
+                        total_score = roe_contrib + pe_contrib + pb_contrib + debt_contrib
+                        grade = get_score_grade(total_score)
+                        
+                        with c1:
+                            st.metric("權益報酬率 (40%)", f"{roe_val:.2f}%")
+                            st.caption(f"得分: {roe_score:.1f} (貢獻 {roe_contrib:.1f} 分)")
+                            
+                        with c2:
+                            st.metric("本益比 (30%)", f"{pe_val:.2f}")
+                            st.caption(f"得分: {pe_score:.1f} (貢獻 {pe_contrib:.1f} 分)")
+                            
+                        with c3:
+                            st.metric("淨值比 (15%)", f"{pb_val:.2f}")
+                            st.caption(f"得分: {pb_score:.1f} (貢獻 {pb_contrib:.1f} 分)")
+                            
+                        with c4:
+                            st.metric("負債率 (15%)", f"{debt_val:.2f}%")
+                            st.caption(f"得分: {debt_score:.1f} (貢獻 {debt_contrib:.1f} 分)")
+                        
+                        # 評分合計
+                        st.markdown(f"""
+                        <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 1rem; border-radius: 8px; margin-top: 1rem; text-align: center;">
+                            <span style="font-size: 0.9rem;">評分合計</span><br>
+                            <span style="font-size: 2rem; font-weight: bold;">{total_score:.2f}</span>
+                            <span style="font-size: 1rem;"> / 10 分</span>
+                            <span style="background: rgba(255,255,255,0.2); padding: 0.25rem 0.75rem; border-radius: 6px; margin-left: 0.5rem; font-size: 1.2rem; font-weight: bold;">{grade} 級</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # 評分指標說明
+                        st.markdown("""
+                        <div style="background-color: #f8fafc; padding: 1rem; border-radius: 8px; margin-top: 1rem; border-left: 4px solid #3b82f6;">
+                            <h4 style="margin: 0 0 0.5rem 0; font-size: 1rem; color: #1e40af;">📊 評分指標說明</h4>
+                            <div style="display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.9rem; color: #4b5563;">
+                                <div><strong>權益報酬率 (40%)</strong><br>核心獲利指標</div>
+                                <div><strong>本益比 (30%)</strong><br>估值合理性</div>
+                                <div><strong>淨值比 (15%)</strong><br>資產價值保護</div>
+                                <div><strong>負債率 (15%)</strong><br>財務安全性</div>
+                            </div>
+                            <hr style="margin: 0.75rem 0; border: none; border-top: 1px solid #e2e8f0;">
+                            <div style="font-size: 0.85rem; color: #6b7280;">
+                                <strong>📌 滿分 10 分標準：</strong>
+                                權益報酬率 ≥ 25% ｜ 本益比 10~15 倍 ｜ 淨值比 ≤ 1 倍 ｜ 負債率 ≤ 30%
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # 總評
+                        analysis = {
+                            'score': total_score,
+                            'grade': grade,
+                            'breakdown': {
+                                'roe_score': roe_score,
+                                'pe_score': pe_score,
+                                'pb_score': pb_score,
+                                'debt_ratio_score': debt_score
+                            }
+                        }
+                        explanation = generate_score_explanation(ai_stock.to_dict(), analysis)
+                        st.info(f"💬 **總評**：{explanation}")
     else:
         st.info("🤔 無法解析查詢條件，請嘗試更明確的描述")
 

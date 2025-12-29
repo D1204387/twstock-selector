@@ -149,31 +149,47 @@ M1427499 陳憶柔
 
 ## 🖥️ 系統展示 - 首頁
 
-![w:900](screenshot_home.png)
+- ✅ 一目了然的市場概況與統計數據
+- ✅ 四大核心功能快速導覽
+
+![w:800](screenshot_home.png)
 
 ---
 
 ## 🔍 搜尋功能
 
-![w:900](screenshot_search.png)
+- ✅ 輸入代號即顯示完整財務指標
+- ✅ **評分明細**：各指標分數、權重一覽
+- ✅ **口語化總評**：自動生成投資建議
+
+![w:800](screenshot_search.png)
 
 ---
 
 ## 🎛️ 策略篩選
 
-![w:900](screenshot_filter.png)
+- ✅ 四大策略：成長股、價值股、高股息、優質股
+- ✅ 一鍵篩選，快速找到符合條件的標的
+
+![w:800](screenshot_filter.png)
 
 ---
 
 ## 🏆 排名分析
 
-![w:900](screenshot_ranking.png)
+- ✅ 綜合評分 0-10 分即時排行
+- ✅ 圖表化呈現產業分佈
+
+![w:800](screenshot_ranking.png)
 
 ---
 
 ## 🤖 AI 智慧選股
 
-![w:900](screenshot_ai.png)
+- ✅ 用自然語言描述需求
+- ✅ 系統自動解析條件並篩選
+
+![w:800](screenshot_ai.png)
 
 ---
 

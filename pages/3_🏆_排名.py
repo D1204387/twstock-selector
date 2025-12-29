@@ -14,7 +14,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.data_fetcher import get_stock_list, generate_sample_data, load_robust_data
-from src.stock_analyzer import calculate_score, get_top_stocks, get_score_grade, score_roe, score_pe, score_pb, score_debt_ratio
+from src.stock_analyzer import calculate_score, get_top_stocks, get_score_grade, score_roe, score_pe, score_pb, score_debt_ratio, generate_score_explanation
 from src.styles import GLARITY_STYLE
 from src.help_docs import SCORING_HELP
 from config import COLUMN_NAMES
@@ -75,9 +75,9 @@ with st.sidebar:
     with st.expander("📚 快速說明"):
         st.markdown("""
         **評分權重**
-        - ROE：40%
-        - PE：30%
-        - PB：15%
+        - 權益報酬率：40%
+        - 本益比：30%
+        - 淨值比：15%
         - 負債率：15%
         
         [返回首頁查看完整說明](/)
@@ -202,68 +202,142 @@ else:
             
             if is_etf:
                 c1, c2 = st.columns(2)
+                
+                # 計算各項分數和貢獻
+                div_yield_val = stock.get('dividend_yield', 0) or 0
+                from src.stock_analyzer import score_dividend_yield, score_dividend_years
+                div_yield_score = score_dividend_yield(div_yield_val)
+                div_yield_contrib = div_yield_score * 0.8
+                
+                div_years_val = stock.get('dividend_years', 0) or 0
+                div_years_score = score_dividend_years(div_years_val)
+                div_years_contrib = div_years_score * 0.2
+                
+                total_score = div_yield_contrib + div_years_contrib
+                
                 with c1:
-                    val = stock.get('dividend_yield', 0)
-                    # ETF 殖利率權重 70%
-                    from src.stock_analyzer import score_dividend_yield, ETF_SCORING_WEIGHTS
-                    score = score_dividend_yield(val)
-                    st.metric("殖利率 (70%)", f"{val:.2f}%")
-                    st.caption(f"得分: {score:.1f} (貢獻 {score*0.7:.1f})")
+                    st.metric("殖利率 (80%)", f"{div_yield_val:.2f}%")
+                    st.caption(f"得分: {div_yield_score:.1f} (貢獻 {div_yield_contrib:.1f} 分)")
                 
                 with c2:
-                    val = stock.get('pb', 0)
-                    # ETF PB 權重 30%
-                    from src.stock_analyzer import score_pb
-                    score = score_pb(val)
-                    st.metric("PB (30%)", f"{val:.2f}")
-                    st.caption(f"得分: {score:.1f} (貢獻 {score*0.3:.1f})")
+                    st.metric("配息年數 (20%)", f"{int(div_years_val)} 年")
+                    st.caption(f"得分: {div_years_score:.1f} (貢獻 {div_years_contrib:.1f} 分)")
+                
+                # 評分合計
+                grade = get_score_grade(total_score)
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 1rem; border-radius: 8px; margin-top: 1rem; text-align: center;">
+                    <span style="font-size: 0.9rem;">評分合計</span><br>
+                    <span style="font-size: 2rem; font-weight: bold;">{total_score:.2f}</span>
+                    <span style="font-size: 1rem;"> / 10 分</span>
+                    <span style="background: rgba(255,255,255,0.2); padding: 0.25rem 0.75rem; border-radius: 6px; margin-left: 0.5rem; font-size: 1.2rem; font-weight: bold;">{grade} 級</span>
+                </div>
+                """, unsafe_allow_html=True)
                     
                 st.markdown("""
                 <div style="background-color: #f8fafc; padding: 1rem; border-radius: 8px; margin-top: 1rem; border-left: 4px solid #3b82f6;">
                     <h4 style="margin: 0 0 0.5rem 0; font-size: 1rem; color: #1e40af;">📊 ETF 評分指標說明</h4>
                     <div style="display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.9rem; color: #4b5563;">
-                        <div><strong>殖利率 (70%)</strong><br>配息收益能力</div>
-                        <div><strong>PB (30%)</strong><br>折溢價狀況</div>
+                        <div><strong>殖利率 (80%)</strong><br>配息收益能力</div>
+                        <div><strong>配息年數 (20%)</strong><br>配息穩定度</div>
+                    </div>
+                    <hr style="margin: 0.75rem 0; border: none; border-top: 1px solid #e2e8f0;">
+                    <div style="font-size: 0.85rem; color: #6b7280;">
+                        <strong>📌 滿分 10 分標準：</strong>
+                        殖利率 ≥ 6% ｜ 配息年數 ≥ 10 年
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+                
+                # 總評
+                analysis = {
+                    'score': total_score,
+                    'grade': grade,
+                    'breakdown': {
+                        'dividend_yield_score': div_yield_score,
+                        'dividend_years_score': div_years_score
+                    }
+                }
+                explanation = generate_score_explanation(stock.to_dict(), analysis)
+                st.info(f"💬 **總評**：{explanation}")
                 
             else:
                 # 一般個股
                 c1, c2, c3, c4 = st.columns(4)
                 
+                # 計算各項分數和貢獻
+                roe_val = stock.get('roe', 0) or 0
+                roe_score = score_roe(roe_val)
+                roe_contrib = roe_score * 0.4
+                
+                pe_val = stock.get('pe', 0) or 0
+                pe_score = score_pe(pe_val)
+                pe_contrib = pe_score * 0.3
+                
+                pb_val = stock.get('pb', 0) or 0
+                pb_score = score_pb(pb_val)
+                pb_contrib = pb_score * 0.15
+                
+                debt_val = stock.get('debt_ratio', 0) or 0
+                debt_score = score_debt_ratio(debt_val)
+                debt_contrib = debt_score * 0.15
+                
+                total_score = roe_contrib + pe_contrib + pb_contrib + debt_contrib
+                
                 with c1: 
-                    val = stock.get('roe', 0)
-                    score = score_roe(val)
-                    st.metric("ROE", f"{val:.2f}%")
-                    st.caption(f"得分: {score:.1f}")
+                    st.metric("權益報酬率 (40%)", f"{roe_val:.2f}%")
+                    st.caption(f"得分: {roe_score:.1f} (貢獻 {roe_contrib:.1f} 分)")
                     
                 with c2: 
-                    val = stock.get('pe', 0)
-                    score = score_pe(val)
-                    st.metric("PE", f"{val:.2f}")
-                    st.caption(f"得分: {score:.1f}")
+                    st.metric("本益比 (30%)", f"{pe_val:.2f}")
+                    st.caption(f"得分: {pe_score:.1f} (貢獻 {pe_contrib:.1f} 分)")
                     
                 with c3: 
-                    val = stock.get('pb', 0)
-                    score = score_pb(val)
-                    st.metric("PB", f"{val:.2f}")
-                    st.caption(f"得分: {score:.1f}")
+                    st.metric("淨值比 (15%)", f"{pb_val:.2f}")
+                    st.caption(f"得分: {pb_score:.1f} (貢獻 {pb_contrib:.1f} 分)")
                     
                 with c4: 
-                    val = stock.get('debt_ratio', 0)
-                    score = score_debt_ratio(val)
-                    st.metric("負債率", f"{val:.2f}%")
-                    st.caption(f"得分: {score:.1f}")
+                    st.metric("負債率 (15%)", f"{debt_val:.2f}%")
+                    st.caption(f"得分: {debt_score:.1f} (貢獻 {debt_contrib:.1f} 分)")
+                
+                # 評分合計
+                grade = get_score_grade(total_score)
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 1rem; border-radius: 8px; margin-top: 1rem; text-align: center;">
+                    <span style="font-size: 0.9rem;">評分合計</span><br>
+                    <span style="font-size: 2rem; font-weight: bold;">{total_score:.2f}</span>
+                    <span style="font-size: 1rem;"> / 10 分</span>
+                    <span style="background: rgba(255,255,255,0.2); padding: 0.25rem 0.75rem; border-radius: 6px; margin-left: 0.5rem; font-size: 1.2rem; font-weight: bold;">{grade} 級</span>
+                </div>
+                """, unsafe_allow_html=True)
                 
                 st.markdown("""
                 <div style="background-color: #f8fafc; padding: 1rem; border-radius: 8px; margin-top: 1rem; border-left: 4px solid #3b82f6;">
                     <h4 style="margin: 0 0 0.5rem 0; font-size: 1rem; color: #1e40af;">📊 評分指標說明</h4>
                     <div style="display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.9rem; color: #4b5563;">
-                        <div><strong>ROE (40%)</strong><br>核心獲利指標</div>
-                        <div><strong>PE (30%)</strong><br>估值合理性</div>
-                        <div><strong>PB (15%)</strong><br>資產價值保護</div>
+                        <div><strong>權益報酬率 (40%)</strong><br>核心獲利指標</div>
+                        <div><strong>本益比 (30%)</strong><br>估值合理性</div>
+                        <div><strong>淨值比 (15%)</strong><br>資產價值保護</div>
                         <div><strong>負債率 (15%)</strong><br>財務安全性</div>
+                    </div>
+                    <hr style="margin: 0.75rem 0; border: none; border-top: 1px solid #e2e8f0;">
+                    <div style="font-size: 0.85rem; color: #6b7280;">
+                        <strong>📌 滿分 10 分標準：</strong>
+                        權益報酬率 ≥ 25% ｜ 本益比 10~15 倍 ｜ 淨值比 ≤ 1 倍 ｜ 負債率 ≤ 30%
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+                
+                # 總評
+                analysis = {
+                    'score': total_score,
+                    'grade': grade,
+                    'breakdown': {
+                        'roe_score': roe_score,
+                        'pe_score': pe_score,
+                        'pb_score': pb_score,
+                        'debt_ratio_score': debt_score
+                    }
+                }
+                explanation = generate_score_explanation(stock.to_dict(), analysis)
+                st.info(f"💬 **總評**：{explanation}")

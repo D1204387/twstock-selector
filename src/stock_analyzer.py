@@ -335,6 +335,87 @@ def get_score_breakdown(stock_data: pd.Series, weights: Dict = None) -> Dict:
     return breakdown
 
 
+def generate_score_explanation(stock_data: Dict, analysis: Dict) -> str:
+    """生成評分的口語化說明
+    
+    Args:
+        stock_data: 股票資料字典
+        analysis: analyze_stock 函數的結果
+    
+    Returns:
+        口語化的評分說明
+    """
+    stock_id = str(stock_data.get('stock_id', ''))
+    name = stock_data.get('name', stock_id)
+    is_etf = stock_id.startswith('00')
+    
+    score = analysis['score']
+    grade = analysis['grade']
+    breakdown = analysis['breakdown']
+    
+    # 根據等級生成評語
+    if score >= 8:
+        grade_desc = "極優"
+    elif score >= 6:
+        grade_desc = "優良"
+    elif score >= 4:
+        grade_desc = "普通"
+    else:
+        grade_desc = "待觀察"
+    
+    parts = [f"**{name}** 獲得 **{score:.1f} 分**（{grade} 等級），屬於「{grade_desc}」類型。"]
+    
+    if is_etf:
+        # ETF 說明
+        div_yield = stock_data.get('dividend_yield', 0) or 0
+        div_years = stock_data.get('dividend_years', 0) or 0
+        
+        if div_yield >= 5:
+            parts.append(f"殖利率表現優秀（{div_yield:.1f}%），配息吸引力高。")
+        elif div_yield >= 3:
+            parts.append(f"殖利率尚可（{div_yield:.1f}%）。")
+        else:
+            parts.append(f"殖利率偏低（{div_yield:.1f}%），股息吸引力較低。")
+        
+        if div_years >= 5:
+            parts.append(f"連續配息 {int(div_years)} 年，配息穩定度高。")
+        elif div_years >= 3:
+            parts.append(f"連續配息 {int(div_years)} 年。")
+    else:
+        # 一般個股說明
+        roe = stock_data.get('roe', 0) or 0
+        pe = stock_data.get('pe', 0) or 0
+        pb = stock_data.get('pb', 0) or 0
+        debt = stock_data.get('debt_ratio', 0) or 0
+        
+        roe_score = breakdown.get('roe_score', 0)
+        pe_score = breakdown.get('pe_score', 0)
+        
+        # 獲利能力評語
+        if roe_score >= 8:
+            parts.append(f"獲利能力優秀（ROE {roe:.1f}%），")
+        elif roe_score >= 5:
+            parts.append(f"獲利能力正常（ROE {roe:.1f}%），")
+        else:
+            parts.append(f"獲利能力偏弱（ROE {roe:.1f}%），")
+        
+        # 估值評語
+        if pe_score >= 8:
+            parts[-1] = parts[-1] + f"目前股價估值合理（PE {pe:.1f}）。"
+        elif pe_score >= 5:
+            parts[-1] = parts[-1] + f"股價估值略高（PE {pe:.1f}）。"
+        else:
+            parts[-1] = parts[-1] + f"股價估值偏貴（PE {pe:.1f}），建議留意進場時機。"
+        
+        # 財務健康度
+        if debt < 40:
+            parts.append("財務結構穩健。")
+        elif debt > 60:
+            parts.append("負債比例偏高，需注意財務風險。")
+    
+    return " ".join(parts)
+
+
 def get_score_grade(score: float) -> str:
     """取得評分等級"""
     if score >= 9:
