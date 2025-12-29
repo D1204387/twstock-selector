@@ -108,7 +108,7 @@ INDICATORS = {
         "interpretation": "越高越好，高殖利率適合追求穩定現金流的投資人。> 4% 為理想。"
     },
     
-    # 成長性指標
+    # 財務安全指標（配息穩定性）
     "dividend_years": {
         "name": "配息年數",
         "full_name": "連續配息年數",
@@ -117,7 +117,7 @@ INDICATORS = {
         "ideal_min": 5,
         "ideal_max": None,
         "unit": "年",
-        "category": "成長性",
+        "category": "財務安全",
         "interpretation": "越長越好，代表公司經營穩定，股利政策一致。> 5 年為理想。"
     },
     
@@ -194,6 +194,14 @@ STRATEGIES = {
     }
 }
 
+# 策略簡要說明（供側邊欄等快速說明使用，含單位）
+STRATEGY_SUMMARIES = {
+    "growth": "權益報酬率≥20%, 淨利率≥20%, 負債率≤50%",
+    "value": "本益比≤15倍, 淨值比≤2倍, 權益報酬率≥10%, 殖利率≥3%",
+    "dividend": "殖利率≥5%, 配息年數≥5年, 負債率≤60%",
+    "quality": "權益報酬率≥15%, 本益比:10-20倍, 負債率≤40%"
+}
+
 # 產業類別
 INDUSTRIES = [
     "全部",
@@ -242,3 +250,29 @@ CACHE_TTL = {
     "financial_data": 86400,  # 24 小時
     "price_data": 300         # 5 分鐘
 }
+
+# 統一欄位名稱（供所有頁面共用）
+COLUMN_NAMES = {
+    'stock_id': '代號',
+    'name': '名稱',
+    'price': '股價',
+    'score': '評分',
+    'industry': '產業',
+    'market': '市場',
+    'asset_type': '類型',
+    # 獲利能力
+    'roe': '權益報酬率%',
+    'roa': '資產報酬率%',
+    'net_profit_margin': '淨利率%',
+    'gross_margin': '毛利率%',
+    'operating_margin': '營業利潤率%',
+    # 估值指標
+    'pe': '本益比',
+    'pb': '淨值比',
+    'eps': '每股盈餘',
+    'dividend_yield': '殖利率%',
+    # 財務安全
+    'debt_ratio': '負債率%',
+    'dividend_years': '配息年數'
+}
+

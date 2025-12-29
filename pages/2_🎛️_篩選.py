@@ -16,7 +16,7 @@ from src.data_fetcher import get_stock_list, generate_sample_data, load_robust_d
 from src.stock_screener import custom_screen, apply_strategy, format_strategy_conditions, get_strategy_matches_count
 from src.stock_analyzer import calculate_score
 from src.styles import GLARITY_STYLE
-from config import INDICATORS, INDUSTRIES, ASSET_TYPES, STRATEGIES
+from config import INDICATORS, INDUSTRIES, ASSET_TYPES, STRATEGIES, COLUMN_NAMES, STRATEGY_SUMMARIES
 
 st.set_page_config(page_title="策略篩選 - 台股智選系統", page_icon="📊", layout="wide")
 
@@ -84,19 +84,40 @@ st.markdown("""
 st.title("📊 策略篩選")
 st.caption("選擇快速策略或自訂條件，找出符合需求的股票")
 
+# 頁面使用說明
+with st.expander("💡 如何使用本頁", expanded=False):
+    st.markdown("""
+    ### 📌 使用流程
+    
+    **方法一：快速策略（推薦新手）**
+    1. 在下方「快速策略」區選擇一個策略（如成長股、價值股）
+    2. 點擊「選擇」按鈕
+    3. 系統自動篩選符合條件的股票
+    
+    **方法二：自訂篩選**
+    1. 點擊「自訂篩選」按鈕
+    2. 展開「自訂篩選條件」
+    3. 調整各指標滑桿設定條件
+    4. 結果即時更新
+    
+    ### 📊 指標速查
+    | 指標 | 說明 | 理想值 |
+    |------|------|--------|
+    | ROE (%) | 權益報酬率，衡量獲利能力 | > 15% |
+    | 本益比上限 | 股價相對盈餘的倍數 | 10-20 倍 |
+    | 殖利率 (%) | 每年配息相對股價的比率 | > 4% |
+    | 負債率上限 (%) | 負債占總資產比例 | < 50% |
+    """)
+
 # 側邊欄說明
 with st.sidebar:
     st.divider()
     with st.expander("📚 快速說明"):
-        st.markdown("""
-        **策略說明**
-        - 🚀 成長股：ROE>15%, EPS成長>15%
-        - 💎 價值股：PE<15, PB<2
-        - 💰 高股息：殖利率>5%
-        - ⭐ 優質股：ROE>15%, 負債率<40%
-        
-        [返回首頁查看完整說明](/)
-        """)
+        st.markdown("**策略說明**")
+        for key, strategy in STRATEGIES.items():
+            summary = STRATEGY_SUMMARIES.get(key, "")
+            st.markdown(f"- {strategy['name']}：{summary}")
+        st.markdown("\n[返回首頁查看完整說明](/)")
 
 @st.cache_data(ttl=3600)
 def load_data():
@@ -123,21 +144,30 @@ for i, (key, strategy) in enumerate(STRATEGIES.items()):
         # 生成條件標準文字
         conditions = strategy.get('conditions', {})
         criteria_list = []
-        # 簡易中文對照表
+        # 簡易中文對照表（含單位）
         display_map = {
-            'roe': '權益報酬率', 'pe': '本益比', 'pb': '淨值比', 'eps': '每股盈餘',
-            'dividend_yield': '殖利率', 'dividend_years': '配息年數',
-            'debt_ratio': '負債率'
+            'roe': ('權益報酬率', '%'),
+            'roa': ('資產報酬率', '%'),
+            'net_profit_margin': ('淨利率', '%'),
+            'gross_margin': ('毛利率', '%'),
+            'operating_margin': ('營業利潤率', '%'),
+            'pe': ('本益比', '倍'),
+            'pb': ('淨值比', '倍'),
+            'eps': ('每股盈餘', '元'),
+            'dividend_yield': ('殖利率', '%'),
+            'dividend_years': ('配息年數', '年'),
+            'debt_ratio': ('負債率', '%')
         }
 
         for cond_key, cond_val in conditions.items():
-            name = display_map.get(cond_key, cond_key.upper())
+            name_info = display_map.get(cond_key, (cond_key.upper(), ''))
+            name, unit = name_info if isinstance(name_info, tuple) else (name_info, '')
             if 'min' in cond_val and 'max' in cond_val:
-                criteria_list.append(f"{name}: {cond_val['min']}-{cond_val['max']}")
+                criteria_list.append(f"{name}: {cond_val['min']}-{cond_val['max']}{unit}")
             elif 'min' in cond_val:
-                criteria_list.append(f"{name} ≥ {cond_val['min']}")
+                criteria_list.append(f"{name} ≥ {cond_val['min']}{unit}")
             elif 'max' in cond_val:
-                criteria_list.append(f"{name} ≤ {cond_val['max']}")
+                criteria_list.append(f"{name} ≤ {cond_val['max']}{unit}")
         criteria_text = " | ".join(criteria_list) if criteria_list else ""
         
         # 判斷是否為選中狀態
@@ -185,12 +215,24 @@ with st.expander("⚙️ 自訂篩選條件", expanded=(selected_strategy is Non
         industry = st.selectbox("產業別", INDUSTRIES)
     
     with col2:
-        roe_min = st.slider("ROE (%)", 0, 50, 0)
-        pe_max = st.slider("本益比上限", 5, 100, 100)
+        roe_min = st.slider(
+            "ROE (%)", 0, 50, 0,
+            help="權益報酬率：衡量公司運用股東資本創造利潤的能力。\n理想值：> 15%，越高代表獲利能力越強。"
+        )
+        pe_max = st.slider(
+            "本益比上限", 5, 100, 100,
+            help="本益比 (PE)：股價 ÷ 每股盈餘。\n理想區間：10-20 倍。過高可能偏貴，過低可能有隱憂。"
+        )
     
     with col3:
-        div_min = st.slider("殖利率 (%)", 0.0, 15.0, 0.0, 0.5)
-        debt_max = st.slider("負債率上限 (%)", 0, 100, 100)
+        div_min = st.slider(
+            "殖利率 (%)", 0.0, 15.0, 0.0, 0.5,
+            help="現金殖利率：每年配息 ÷ 股價 × 100%。\n理想值：> 4%，適合追求穩定現金流的投資人。"
+        )
+        debt_max = st.slider(
+            "負債率上限 (%)", 0, 100, 100,
+            help="負債比率：總負債 ÷ 總資產 × 100%。\n理想值：< 50%，越低代表財務越穩健。"
+        )
     
     exclude_loss = st.checkbox("排除虧損公司")
     st.markdown('</div>', unsafe_allow_html=True)
@@ -277,10 +319,7 @@ else:
     # 加入序號欄位
     display_df.insert(0, '序號', range(start_idx + 1, end_idx + 1))
     
-    column_names = {'stock_id': '代號', 'name': '名稱', 'price': '股價', 'score': '評分',
-                    'roe': '權益報酬率%', 'pe': '本益比', 'pb': '淨值比', 'debt_ratio': '負債率%',
-                    'dividend_yield': '殖利率%', 'dividend_years': '配息年數'}
-    display_df = display_df.rename(columns=column_names)
+    display_df = display_df.rename(columns=COLUMN_NAMES)
     
     for col in display_df.select_dtypes(include=['float64']).columns:
         display_df[col] = display_df[col].round(2)
@@ -293,7 +332,10 @@ else:
     # 匯出全部資料
     export_df = filtered_df[['stock_id', 'name', 'industry', 'score', 'roe', 'pe', 'pb', 'dividend_yield', 'debt_ratio'] if all(c in filtered_df.columns for c in ['stock_id', 'name']) else filtered_df.columns].copy()
     export_df.insert(0, '序號', range(1, len(export_df) + 1))
-    st.download_button(f"📥 匯出全部 {total_count} 筆 CSV", export_df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'),
+    csv_data = export_df.to_csv(index=False)
+    # 加入 BOM 讓 Excel 正確顯示中文
+    csv_bytes = b'\xef\xbb\xbf' + csv_data.encode('utf-8')
+    st.download_button(f"📥 匯出全部 {total_count} 筆 CSV", csv_bytes,
                        "filtered_stocks.csv", "text/csv")
     
     st.divider()
@@ -321,11 +363,20 @@ else:
 
 # 指標說明
 with st.expander("📚 指標說明"):
-    # 僅顯示篩選頁主要使用的指標
-    target_indicators = ['roe', 'pe', 'dividend_yield', 'debt_ratio']
+    # 顯示結果表格中的所有指標
+    target_indicators = ['roe', 'pe', 'pb', 'debt_ratio', 'dividend_yield', 'dividend_years']
     
     for key in target_indicators:
         if key in INDICATORS:
             info = INDICATORS[key]
-            ideal = f"> {info['ideal_min']}" if info.get('ideal_min') else f"< {info['ideal_max']}" if info.get('ideal_max') else "N/A"
+            # 處理理想值顯示
+            if info.get('ideal_min') and info.get('ideal_max'):
+                ideal = f"{info['ideal_min']}~{info['ideal_max']}"
+            elif info.get('ideal_min'):
+                ideal = f"> {info['ideal_min']}"
+            elif info.get('ideal_max'):
+                ideal = f"< {info['ideal_max']}"
+            else:
+                ideal = "N/A"
             st.markdown(f"**{info['name']}** - {info['description']} (理想值: {ideal}{info.get('unit', '')})")
+

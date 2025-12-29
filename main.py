@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from src.data_fetcher import get_stock_list, generate_sample_data, load_robust_data, get_data_update_time
 from src.stock_analyzer import get_top_stocks
 from src.styles import GLARITY_STYLE
-from config import STRATEGIES
+from config import STRATEGIES, STRATEGY_SUMMARIES
 from src.help_docs import SCORING_HELP
 from src.env_validator import validate_env_vars
 
@@ -302,7 +302,7 @@ def main():
             | 每股盈餘(EPS) | 稅後淨利 ÷ 股數 | 每一股可分配到的盈餘 | > 3 元 |
             | 殖利率 | 現金股利 ÷ 股價 | 每年現金股利相對於股價的比率 | > 4% |
             
-            #### 🔷 其他指標（2 項）
+            #### 🔷 財務安全（2 項）
             | 指標 | 公式 | 說明 | 理想值 |
             |------|------|------|--------|
             | 配息年數 | 連續配息年數 | 公司連續發放現金股利的年數 | > 5 年 |
@@ -322,10 +322,10 @@ def main():
             
             | 策略 | 使用指標 | 篩選條件 |
             |------|---------|---------|
-            | 🚀 **成長股** | ROE、EPS成長、營收成長 | ROE>15%, EPS成長>15%, 營收成長>10% |
-            | 💎 **價值股** | PE、PB、ROE、殖利率 | PE<15, PB<2, ROE>10%, 殖利率>3% |
-            | 💰 **高股息** | 殖利率、配息年數、負債率 | 殖利率>5%, 配息>5年, 負債率<60% |
-            | ⭐ **優質股** | ROE、PE、負債率 | ROE>15%, PE 10-20, 負債率<40% |
+            | 🚀 **成長股** | 權益報酬率、淨利率、負債率 | 權益報酬率≥20%, 淨利率≥20%, 負債率≤50% |
+            | 💎 **價值股** | 本益比、淨值比、權益報酬率、殖利率 | 本益比≤15倍, 淨值比≤2倍, 權益報酬率≥10%, 殖利率≥3% |
+            | 💰 **高股息** | 殖利率、配息年數、負債率 | 殖利率≥5%, 配息年數≥5年, 負債率≤60% |
+            | ⭐ **優質股** | 權益報酬率、本益比、負債率 | 權益報酬率≥15%, 本益比:10-20倍, 負債率≤40% |
             
             ---
             

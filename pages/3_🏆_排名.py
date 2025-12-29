@@ -17,6 +17,7 @@ from src.data_fetcher import get_stock_list, generate_sample_data, load_robust_d
 from src.stock_analyzer import calculate_score, get_top_stocks, get_score_grade, score_roe, score_pe, score_pb, score_debt_ratio
 from src.styles import GLARITY_STYLE
 from src.help_docs import SCORING_HELP
+from config import COLUMN_NAMES
 
 
 
@@ -149,10 +150,7 @@ else:
     display_cols = [c for c in display_cols if c in display_df.columns or c in ['排名', '等級']]
     result_df = display_df[display_cols].copy()
     
-    column_names = {'stock_id': '代號', 'name': '名稱', 'price': '股價', 'score': '評分',
-                    'roe': '權益報酬率%', 'pe': '本益比', 'pb': '淨值比', 'debt_ratio': '負債率%', 
-                    'dividend_yield': '殖利率%', 'dividend_years': '配息年數'}
-    result_df = result_df.rename(columns=column_names)
+    result_df = result_df.rename(columns=COLUMN_NAMES)
     
     for col in result_df.select_dtypes(include=['float64']).columns:
         result_df[col] = result_df[col].round(2)
@@ -162,7 +160,9 @@ else:
     
     st.dataframe(result_df, use_container_width=True, hide_index=True)
     
-    st.download_button("📥 匯出 CSV", display_df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'),
+    csv_data = display_df.to_csv(index=False)
+    csv_bytes = b'\xef\xbb\xbf' + csv_data.encode('utf-8')
+    st.download_button("📥 匯出 CSV", csv_bytes,
                        f"top_{top_n}_stocks.csv", "text/csv")
     
     st.divider()

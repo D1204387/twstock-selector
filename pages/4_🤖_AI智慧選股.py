@@ -16,6 +16,7 @@ from src.stock_screener import custom_screen
 from src.stock_analyzer import calculate_score
 from src.ai_query import parse_natural_query, EXAMPLE_QUERIES
 from src.styles import GLARITY_STYLE
+from config import COLUMN_NAMES
 
 st.set_page_config(page_title="AI 智慧選股 - 台股智選系統", page_icon="🤖", layout="wide")
 
@@ -260,10 +261,7 @@ if query:
             # 加入序號欄位
             display_df.insert(0, '序號', range(1, len(display_df) + 1))
             
-            column_names = {'stock_id': '代號', 'name': '名稱', 'price': '股價', 'score': '評分',
-                            'roe': '權益報酬率%', 'pe': '本益比', 'pb': '淨值比', 'debt_ratio': '負債率%',
-                            'dividend_yield': '殖利率%', 'dividend_years': '配息年數'}
-            display_df = display_df.rename(columns=column_names)
+            display_df = display_df.rename(columns=COLUMN_NAMES)
             
             for col in display_df.select_dtypes(include=['float64']).columns:
                 display_df[col] = display_df[col].round(2)
@@ -279,17 +277,19 @@ if query:
             # 準備 CSV 資料（含序號）
             export_df = filtered_df[display_cols].copy()
             export_df.insert(0, '序號', range(1, len(export_df) + 1))
-            export_df = export_df.rename(columns=column_names)
+            export_df = export_df.rename(columns=COLUMN_NAMES)
             
             # 使用 st.download_button 讓用戶直接下載
-            csv_data = export_df.to_csv(index=False, encoding='utf-8-sig')
+            csv_data = export_df.to_csv(index=False)
+            # 加入 BOM 讓 Excel 正確顯示中文
+            csv_bytes = b'\xef\xbb\xbf' + csv_data.encode('utf-8')
             
             st.download_button(
                 label=f"📥 匯出 CSV ({len(filtered_df)} 檔)",
-                data=csv_data.encode('utf-8-sig'),
-                file_name=f"AI選股結果_{len(filtered_df)}檔.csv",
+                data=csv_bytes,
+                file_name="ai_stock_selection.csv",
                 mime="text/csv",
-                type="primary"
+                key="download_csv"
             )
     else:
         st.info("🤔 無法解析查詢條件，請嘗試更明確的描述")
