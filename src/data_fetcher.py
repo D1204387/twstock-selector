@@ -14,6 +14,11 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 import time
 import json
+import urllib3
+from pathlib import Path
+
+# 抑制 SSL 警告（因為台灣證交所 SSL 證書有時會有問題）
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 try:
     import twstock
@@ -31,11 +36,16 @@ TWSE_STOCK_LIST_URL = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_A
 TPEX_STOCK_LIST_URL = "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes"
 TWSE_ETF_URL = "https://www.twse.com.tw/rwd/zh/ETF/etfDiv"
 
+# 快取目錄
+CACHE_DIR = Path(__file__).parent.parent / "data" / "cache"
+STOCK_LIST_CACHE = CACHE_DIR / "stock_list_cache.csv"
+
 
 def fetch_twse_stocks() -> pd.DataFrame:
     """從證交所取得上市股票列表"""
     try:
-        response = requests.get(TWSE_STOCK_LIST_URL, timeout=30)
+        # 添加 verify=False 來繞過 SSL 驗證問題
+        response = requests.get(TWSE_STOCK_LIST_URL, timeout=30, verify=False)
         response.raise_for_status()
         data = response.json()
         
@@ -61,7 +71,8 @@ def fetch_twse_stocks() -> pd.DataFrame:
 def fetch_tpex_stocks() -> pd.DataFrame:
     """從櫃買中心取得上櫃股票列表"""
     try:
-        response = requests.get(TPEX_STOCK_LIST_URL, timeout=30)
+        # 添加 verify=False 來繞過 SSL 驗證問題
+        response = requests.get(TPEX_STOCK_LIST_URL, timeout=30, verify=False)
         response.raise_for_status()
         data = response.json()
         
@@ -84,6 +95,28 @@ def fetch_tpex_stocks() -> pd.DataFrame:
     return pd.DataFrame()
 
 
+def _load_stock_list_cache() -> pd.DataFrame:
+    """從快取載入股票列表"""
+    if STOCK_LIST_CACHE.exists():
+        try:
+            df = pd.read_csv(STOCK_LIST_CACHE, dtype={'stock_id': str})
+            print(f"📂 使用股票列表快取: {len(df)} 檔")
+            return df
+        except Exception as e:
+            print(f"❌ 讀取股票列表快取失敗: {e}")
+    return pd.DataFrame()
+
+
+def _save_stock_list_cache(df: pd.DataFrame):
+    """儲存股票列表到快取"""
+    try:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        df.to_csv(STOCK_LIST_CACHE, index=False, encoding='utf-8-sig')
+        print(f"💾 已儲存股票列表快取: {len(df)} 檔")
+    except Exception as e:
+        print(f"❌ 儲存股票列表快取失敗: {e}")
+
+
 def fetch_stock_industry() -> Dict[str, str]:
     """取得股票產業分類（使用 twstock）"""
     industry_map = {}
@@ -101,7 +134,8 @@ def fetch_stock_industry() -> Dict[str, str]:
     if not industry_map:
         url = "https://openapi.twse.com.tw/v1/opendata/t187ap03_L"
         try:
-            response = requests.get(url, timeout=30)
+            # 添加 verify=False 來繞過 SSL 驗證問題
+            response = requests.get(url, timeout=30, verify=False)
             response.raise_for_status()
             data = response.json()
             
@@ -142,16 +176,44 @@ def get_stock_list(force_refresh: bool = False, core_only: bool = True) -> pd.Da
     # 合併
     df = pd.concat([twse_df, tpex_df], ignore_index=True)
     
+    # 如果 API 失敗（空的 DataFrame），嘗試使用快取
+    if df.empty:
+        print("⚠️ API 取得股票列表失敗，嘗試使用快取...")
+        df = _load_stock_list_cache()
+        
+        # 如果快取也沒有，從 robust_indicators_data.csv 建立基礎列表
+        if df.empty:
+            from .finmind_api import CACHE_DIR as FINMIND_CACHE_DIR, get_core_stocks_list
+            robust_file = FINMIND_CACHE_DIR / "robust_indicators_data.csv"
+            if robust_file.exists():
+                try:
+                    cached_df = pd.read_csv(robust_file, dtype={'stock_id': str})
+                    if 'stock_id' in cached_df.columns:
+                        df = cached_df[['stock_id', 'name']].copy() if 'name' in cached_df.columns else cached_df[['stock_id']].copy()
+                        if 'name' not in df.columns:
+                            df['name'] = df['stock_id']  # 暫時使用代號作為名稱
+                        df['industry'] = '其他'
+                        df['market'] = '上市'
+                        df['asset_type'] = df['stock_id'].apply(
+                            lambda x: 'etf' if str(x).startswith('00') else 'stock'
+                        )
+                        print(f"📂 從快取指標資料建立股票列表: {len(df)} 檔")
+                except Exception as e:
+                    print(f"❌ 讀取指標快取失敗: {e}")
+    
+    # 如果還是空的，返回空 DataFrame
+    if df.empty:
+        print("❌ 無法取得股票列表")
+        return df
+    
     # 取得產業分類
     industry_map = fetch_stock_industry()
-    df['industry'] = df['stock_id'].map(industry_map).fillna('其他')
+    if 'stock_id' in df.columns:
+        df['industry'] = df['stock_id'].map(industry_map).fillna('其他')
     
     if not df.empty:
-        # save_stocks(df)
-        
-        # 設定快取
-        # set_cache('stock_list', df.to_dict('records'), ttl_seconds=86400)
-        
+        # 儲存到快取供下次使用
+        _save_stock_list_cache(df)
         print(f"✅ 已取得 {len(df)} 檔標的")
     
     # 過濾精選股票
