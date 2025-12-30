@@ -330,13 +330,22 @@ else:
     st.dataframe(display_df, use_container_width=True, hide_index=True)
     
     # 匯出全部資料
-    export_df = filtered_df[['stock_id', 'name', 'industry', 'score', 'roe', 'pe', 'pb', 'dividend_yield', 'debt_ratio'] if all(c in filtered_df.columns for c in ['stock_id', 'name']) else filtered_df.columns].copy()
+    # export_df = filtered_df[['stock_id', 'name', 'industry', 'score', 'roe', 'pe', 'pb', 'dividend_yield', 'debt_ratio'] if all(c in filtered_df.columns for c in ['stock_id', 'name']) else filtered_df.columns].copy()
+    # export_df.insert(0, '序號', range(1, len(export_df) + 1))
+    
+    # 匯出全部資料（與表格顯示一致）
+    export_df = filtered_df[display_cols].copy()
     export_df.insert(0, '序號', range(1, len(export_df) + 1))
+    export_df = export_df.rename(columns=COLUMN_NAMES)
+
+    for col in export_df.select_dtypes(include=['float64']).columns:
+        export_df[col] = export_df[col].round(2)
+    
     csv_data = export_df.to_csv(index=False)
     # 加入 BOM 讓 Excel 正確顯示中文
     csv_bytes = b'\xef\xbb\xbf' + csv_data.encode('utf-8')
     st.download_button(f"📥 匯出全部 {total_count} 筆 CSV", csv_bytes,
-                       "filtered_stocks.csv", "text/csv")
+                       f"篩選結果.csv", "text/csv")
     
     st.divider()
     

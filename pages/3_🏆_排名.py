@@ -160,10 +160,10 @@ else:
     
     st.dataframe(result_df, use_container_width=True, hide_index=True)
     
-    csv_data = display_df.to_csv(index=False)
+    csv_data = result_df.to_csv(index=False)
     csv_bytes = b'\xef\xbb\xbf' + csv_data.encode('utf-8')
     st.download_button("📥 匯出 CSV", csv_bytes,
-                       f"top_{top_n}_stocks.csv", "text/csv")
+                       f"top_{top_n}_排行榜.csv", "text/csv")
     
     st.divider()
     

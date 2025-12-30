@@ -285,7 +285,7 @@ if query:
             st.download_button(
                 label=f"📥 匯出 CSV ({len(filtered_df)} 檔)",
                 data=csv_bytes,
-                file_name="ai_stock_selection.csv",
+                file_name="AI智慧選股結果.csv",
                 mime="text/csv",
                 key="download_csv"
             )
