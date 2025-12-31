@@ -158,7 +158,28 @@ else:
     # 評分權重說明
     st.caption("📊 **評分權重** — 一般股票：權益報酬率(ROE) 40% + 本益比(PE) 30% + 淨值比(PB) 15% + 負債率 15% ｜ ETF：殖利率 80% + 配息年數 20%")
     
-    st.dataframe(result_df, use_container_width=True, hide_index=True)
+    # 定義評分顏色邏輯
+    def color_score(val):
+        try:
+            score = float(val)
+            if score >= 8.0:
+                color = '#22c55e'  # Green
+            elif score >= 6.0:
+                color = '#3b82f6'  # Blue
+            elif score >= 4.0:
+                color = '#eab308'  # Yellow
+            else:
+                color = '#ef4444'  # Red
+            return f'color: {color}; font-weight: bold;'
+        except:
+            return ''
+
+    # 應用樣式並顯示
+    st.dataframe(
+        result_df.style.map(color_score, subset=['評分']),
+        use_container_width=True,
+        hide_index=True
+    )
     
     csv_data = result_df.to_csv(index=False)
     csv_bytes = b'\xef\xbb\xbf' + csv_data.encode('utf-8')

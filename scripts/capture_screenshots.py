@@ -32,35 +32,35 @@ async def main():
             # We can find links in the sidebar
             
             # 1. Search Page
-            print("Navigating to Search...")
-            # Click the sidebar link. The text might be "🔍 搜尋" or similar based on filename "1_🔍_搜尋.py"
-            # Streamlit usually cleans up the name in the sidebar
-            # Let's try to find the link by partial text
-            await page.click('text=🔍 搜尋') 
-            await page.wait_for_load_state("networkidle")
-            await page.wait_for_timeout(2000) # Give it a moment to render charts/tables
-            await page.screenshot(path=os.path.join(docs_dir, "screenshot_search.png"))
+            # print("Navigating to Search...")
+            # await page.click('text=🔍 搜尋') 
+            # await page.wait_for_load_state("networkidle")
+            # await page.wait_for_timeout(2000)
+            # await page.screenshot(path=os.path.join(docs_dir, "screenshot_search.png"))
 
             # 2. Filter Page
-            print("Navigating to Filter...")
-            await page.click('text=🎛️ 篩選') 
-            await page.wait_for_load_state("networkidle")
-            await page.wait_for_timeout(2000)
-            await page.screenshot(path=os.path.join(docs_dir, "screenshot_filter.png"))
+            # print("Navigating to Filter...")
+            # await page.click('text=🎛️ 篩選') 
+            # await page.wait_for_load_state("networkidle")
+            # await page.wait_for_timeout(2000)
+            # await page.screenshot(path=os.path.join(docs_dir, "screenshot_filter.png"))
 
             # 3. Ranking Page
             print("Navigating to Ranking...")
             await page.click('text=🏆 排名') 
             await page.wait_for_load_state("networkidle")
             await page.wait_for_timeout(2000)
+            # Scroll down a bit to show the table clearly
+            await page.evaluate("window.scrollBy(0, 300)")
+            await page.wait_for_timeout(1000)
             await page.screenshot(path=os.path.join(docs_dir, "screenshot_ranking.png"))
             
             # 4. AI Page
-            print("Navigating to AI...")
-            await page.click('text=🤖 AI智慧選股')
-            await page.wait_for_load_state("networkidle")
-            await page.wait_for_timeout(2000) 
-            await page.screenshot(path=os.path.join(docs_dir, "screenshot_ai.png"))
+            # print("Navigating to AI...")
+            # await page.click('text=🤖 AI智慧選股')
+            # await page.wait_for_load_state("networkidle")
+            # await page.wait_for_timeout(2000) 
+            # await page.screenshot(path=os.path.join(docs_dir, "screenshot_ai.png"))
 
             print("All screenshots captured.")
 
