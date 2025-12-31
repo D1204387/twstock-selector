@@ -143,14 +143,11 @@ SCORING_WEIGHTS = {
     "debt_ratio": 0.15 # 15%
 }
 
-# ETF 專用評分權重（動態邏輯）
-# 實際評分由 stock_analyzer.py 動態決定：
-# - PB 有值時：殖利率 70% + PB 30%
-# - PB 無值時：殖利率 80% + 配息年數 20%
+# ETF 專用評分權重
+# 殖利率 80% + 配息年數 20%
 ETF_SCORING_WEIGHTS = {
-    "dividend_yield": 0.70,  # 基礎權重
-    "pb": 0.30,              # PB 可用時使用
-    "dividend_years": 0.20   # PB 不可用時替代
+    "dividend_yield": 0.80,
+    "dividend_years": 0.20
 }
 
 # 策略定義
@@ -241,8 +238,8 @@ ASSET_TYPES = {
     "etf": "僅 ETF"
 }
 
-# 資料庫設定
-DATABASE_PATH = "data/twstock.db"
+# 資料庫設定 (本專案使用 CSV 快取，此設定保留供未來擴充參考)
+# DATABASE_PATH = "data/twstock.db"
 
 # 快取設定（秒）
 CACHE_TTL = {

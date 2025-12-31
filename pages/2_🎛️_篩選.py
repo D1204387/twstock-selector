@@ -257,18 +257,49 @@ if not filtered_df.empty and 'roe' in filtered_df.columns:
     filtered_df = filtered_df.sort_values('score', ascending=False)
 
 # ========== 統計數據 ==========
-col1, col2, col3, col4 = st.columns([1.5, 1, 1, 1])
-with col1:
-    st.metric("篩選模式", filter_mode)
-with col2:
-    st.metric("符合條件", f"{len(filtered_df)} 檔")
-with col3:
-    st.metric("通過率", f"{len(filtered_df) / len(df) * 100:.1f}%")
-with col4:
-    avg_score = filtered_df['score'].mean() if not filtered_df.empty and 'score' in filtered_df.columns else 0
-    st.metric("平均評分", f"{avg_score:.2f}")
+#col1, col2, col3, col4 = st.columns([2.5, 1, 1, 1])
+#with col1:
+#    st.metric("篩選模式", filter_mode)
+#with col2:
+#    st.metric("符合條件", f"{len(filtered_df)} 檔")
+#with col3:
+#    st.metric("通過率", f"{len(filtered_df) / len(df) * 100:.1f}%")
+#with col4:
+#    avg_score = filtered_df['score'].mean() if not filtered_df.empty and 'score' in filtered_df.columns else 0
+#    st.metric("平均評分", f"{avg_score:.2f}")
+
+#st.divider()
+
+# 計算統計數據
+pass_rate = len(filtered_df) / len(df) * 100 if len(df) > 0 else 0
+avg_score = filtered_df['score'].mean() if not filtered_df.empty and 'score' in filtered_df.columns else 0
+
+# 使用自訂 HTML 卡片顯示統計數據
+st.markdown(f"""
+<div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 1rem; margin: 1rem 0;">
+    <div style="background: #ffffff; border-radius: 12px; padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #e5e7eb;">
+        <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.25rem;">篩選模式</div>
+        <div style="color: #1f2937; font-size: 1.5rem; font-weight: 600; white-space: nowrap;">{filter_mode}</div>
+    </div>
+    <div style="background: #ffffff; border-radius: 12px; padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #e5e7eb;">
+        <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.25rem;">符合條件</div>
+        <div style="color: #1f2937; font-size: 1.5rem; font-weight: 600;">{len(filtered_df)} 檔</div>
+    </div>
+    <div style="background: #ffffff; border-radius: 12px; padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #e5e7eb;">
+        <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.25rem;">通過率</div>
+        <div style="color: #1f2937; font-size: 1.5rem; font-weight: 600;">{pass_rate:.1f}%</div>
+    </div>
+    <div style="background: #ffffff; border-radius: 12px; padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #e5e7eb;">
+        <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.25rem;">平均評分</div>
+        <div style="color: #1f2937; font-size: 1.5rem; font-weight: 600;">{avg_score:.2f}</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 st.divider()
+
+
+
 
 # ========== 結果顯示 ==========
 if filtered_df.empty:

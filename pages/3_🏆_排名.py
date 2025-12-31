@@ -165,31 +165,6 @@ else:
     st.download_button("📥 匯出 CSV", csv_bytes,
                        f"top_{top_n}_排行榜.csv", "text/csv")
     
-    st.divider()
-    
-    # 圖表
-    st.subheader("📈 分析圖表")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        top_10 = display_df.head(10)
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            y=top_10['name'], x=top_10['score'], orientation='h',
-            marker_color='#2563eb', text=top_10['score'].round(2), textposition='outside'
-        ))
-        fig.update_layout(title="Top 10 評分", xaxis_title="評分", yaxis=dict(autorange="reversed"),
-                         height=400, margin=dict(l=10, r=10, t=40, b=40),
-                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with col2:
-        grade_counts = display_df['等級'].value_counts()
-        fig = px.pie(values=grade_counts.values, names=grade_counts.index, title="等級分布", hole=0.4)
-        fig.update_traces(textposition='inside', textinfo='percent+label',
-                         marker=dict(colors=['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#9ca3af', '#d1d5db']))
-        fig.update_layout(showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig, use_container_width=True)
     
     # 個股明細
     with st.expander("🔍 查看個股評分明細"):

@@ -124,22 +124,29 @@ def main():
         
         st.markdown("""
         <div class="feature-card">
-            <h4>🔍 智慧搜尋</h4>
+            <h4>🔍 搜尋</h4>
             <p>支援股票代號和公司名稱搜尋，顯示完整財務資訊和投資分析。</p>
         </div>
         """, unsafe_allow_html=True)
         
         st.markdown("""
         <div class="feature-card">
-            <h4>📊 策略篩選</h4>
+            <h4>🎛️ 篩選</h4>
             <p>4 種內建策略：成長股、價值股、高股息、優質股，搭配自訂條件篩選。</p>
         </div>
         """, unsafe_allow_html=True)
         
         st.markdown("""
         <div class="feature-card">
-            <h4>🏆 綜合排名</h4>
+            <h4>🏆 排名</h4>
             <p>0-10 分評分系統，Top N 排行榜，支援 CSV 匯出。</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("""
+        <div class="feature-card">
+            <h4>🤖 AI 智慧選股</h4>
+            <p>用自然語言說出您想要找的股票，AI 幫您自動解析與篩選。</p>
         </div>
         """, unsafe_allow_html=True)
     

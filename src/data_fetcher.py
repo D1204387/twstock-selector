@@ -53,13 +53,16 @@ def fetch_twse_stocks() -> pd.DataFrame:
         if not df.empty:
             df = df.rename(columns={
                 'Code': 'stock_id',
-                'Name': 'name'
+                'Name': 'name',
+                'IndustryCategory': 'industry'  # Map industry category
             })
             df['market'] = '上市'
             df['asset_type'] = df['stock_id'].apply(
                 lambda x: 'etf' if x.startswith('00') else 'stock'
             )
-            df['industry'] = '其他'  # 需要另外取得產業分類
+            # Handle cases where IndustryCategory might be missing or titled differently
+            if 'industry' not in df.columns:
+                df['industry'] = '其他'
             
             return df[['stock_id', 'name', 'industry', 'market', 'asset_type']]
     except Exception as e:
