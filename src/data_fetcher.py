@@ -254,10 +254,8 @@ def get_stock_list(force_refresh: bool = False, core_only: bool = True) -> pd.Da
             if mask.any():
                 df.loc[mask, 'industry'] = ind
     
-    # 取得產業分類
-    industry_map = fetch_stock_industry()
-    if 'stock_id' in df.columns:
-        df['industry'] = df['stock_id'].map(industry_map).fillna('其他')
+    
+    return df
     
     if not df.empty:
         # 儲存到快取供下次使用
