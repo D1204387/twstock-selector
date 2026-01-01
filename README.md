@@ -79,10 +79,5 @@ streamlit run main.py
 Python 3.10+ / Streamlit / Pandas / Plotly / FinMind
 **AI 整合**：OpenAI API (GPT-3.5) + Regex Keyword Matching (Fallback)
 
-## 📄 授權
 
-MIT License
 
----
-
-**Python 期末報告 | 2025**
