@@ -3,6 +3,7 @@
 使用 Python 開發的財務分析與選股工具
 
 ![台股智選系統一頁版](docs/台股智選系統一頁版.png)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-black?style=for-the-badge&logo=github)](https://github.com/D1204387/twstock-selector)
 
 ## 🎯 功能特色
 
